@@ -150,31 +150,10 @@ def gen_chunk_indices(regions, chunksize):
     :return: A list containing arrays of array indices
     """
     numchunks = len(regions) / chunksize
-    numchunks = max(1, numchunks)
+    numchunks = int(max(1, numchunks))
     indices = []
     for start in range(numchunks):
         indices.append(np.arange(start, len(regions), step=numchunks))
-    return indices
-
-def gen_chunk_indices_wspan(regions, chunksize, span):
-    if chunksize < span:
-        raise ValueError("Chunk size MUST be greater than or equal to the chunk span (each chunk will contain at least span sites)")
-
-    numchunks = len(regions) / chunksize
-    numchunks = max(1, numchunks)
-    indices = []
-    for chunkindex in range(numchunks):
-        chunksites =[]
-        for start in range(span*chunkindex, len(regions), numchunks*span):
-            chunksites.extend(range(start, min(start+span, len(regions))))
-        indices.append(chunksites)
-
-    #If last chunk contains fewer than 'span' sites, merge it with previous chunk to avoid
-    #having one tiny chunk with all adjacent sites
-    if len(indices[-1]) <= span:
-        indices[-2].extend(indices[-1])
-        indices = indices[0:-1]
-
     return indices
 
 def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv=1.0, chunk_size=1000):
