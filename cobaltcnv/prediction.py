@@ -311,11 +311,11 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
         logging.info("Done computing probabilities, emitting output to {}".format(output_path))
         output_fh = open(output_path, "w")
 
-    output_fh.write("#chrom\tstart\tend\tsample\tcopy_number\tquality\ttargets\n")
+    output_fh.write("#chrom\tstart\tend\tcopy_number\tquality\ttargets\n")
     for call in cnv_calls:
         quality = "{:.3f}".format(call.quality)
         if call.quality >= min_quality:
             output_fh.write("\t".join([str(s) for s in
-                                   [call.chrom, call.start, call.end, sample_names[0], call.copynum, quality,
+                                   [call.chrom, call.start, call.end, call.copynum, quality,
                                     call.targets]]) + "\n")
 

@@ -4,6 +4,7 @@
 
 import argparse
 import logging
+import sys
 from cobaltcnv import training, prediction
 
 logging.basicConfig(level=logging.INFO,
@@ -48,6 +49,11 @@ if __name__=="__main__":
 
 
     # parser.add_argument("--kl", help="Max Kullback-Leibler dist for site optimization, set this to 0.0 to disable site optimization", type=float, default=0.0)
+
+    if len(sys.argv)==1:
+        parser.print_usage()
+        sys.exit(0)
+
 
     args = parser.parse_args()
 

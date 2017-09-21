@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 import os
 import subprocess
 
-install_requires = ['numpy', 'pandas', 'scikit-learn', 'scipy']
+install_requires = ['numpy', 'pandas', 'scikit-learn', 'scipy', 'pysam']
 tests_require    = ['pytest', 'coverage']
 
 classifiers = """
