@@ -18,13 +18,13 @@ class CobaltModel(object):
 def save_model(model, dest_path):
     """ Pickle a CNVModel and dump it to a file """
     logging.info("Saving model to {}".format(dest_path))
-    with open(dest_path, "w") as fh:
+    with open(dest_path, "wb") as fh:
         pickle.dump(model, fh)
 
 def load_model(path):
     """ Unpickle a CNVModel from a file and return it"""
     logging.info("Loading model from {}".format(path))
-    with open(path, "r") as fh:
+    with open(path, "rb") as fh:
         model = pickle.load(fh)
     return model
 

@@ -1,13 +1,11 @@
 
 
 import numpy as np
-import util
-import model
+from cobaltcnv import util, model, transform
 import logging
-import sys
-import transform
 
-def _fit_sites(depth_matrix, depths_prepped, colmeans, colsds, rowmeans, num_components, mods):
+
+def _fit_sites(depth_matrix, depths_prepped, num_components, mods):
     """
     Transform the given data by fitting a PCA to the prepped depths, subtracting the given number of components, iteratively
     predicting the deviations produced by increasing or decreasing the raw depth values at each site, then returning the
@@ -21,16 +19,16 @@ def _fit_sites(depth_matrix, depths_prepped, colmeans, colsds, rowmeans, num_com
     :param chunk_start: For logging only, chunk offset to add to reported site index
     :return: Tuple of (components, (params for each entry in mod), {dict of optimized sites -> components})
     """
-    components = pcatransform.fit_pca(depths_prepped, num_components=num_components)
+    components = transform.fit_pca(depths_prepped, num_components=num_components)
 
-    transformed = pcatransform.transform_raw_iterative(depths_prepped, components, zscores=False)
+    transformed = transform.transform_raw_iterative(depths_prepped, components, zscores=False)
     dmat = np.transpose(depth_matrix)
     all_params = [[] for _ in range(len(mods))]
     num_sites = depths_prepped.shape[1]
 
     for site in range(num_sites):
 
-        fits = pcatransform.fit_site2(dmat, depths_prepped, components, site, transformed, colmeans, colsds, rowmeans, mods=mods, rmoutliers=False)
+        fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False)
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
@@ -202,11 +200,11 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
         which = cvs > max_cv
         if all(which):
             logging.error("All samples have CV > {} !".format(max_cv))
-            sys.exit(1)
+            return
 
         if (len(sample_name)-sum(which))<num_components:
             logging.error("Need at least as many passing samples as components ({} samples passed CV filter, {} components)".format(sum(which), num_components))
-            sys.exit(1)
+            return
 
         if sum(which)==0:
             logging.info("No samples have CV < {}".format(max_cv))
@@ -230,7 +228,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
     masked_depths = depth_matrix[mask, :]
 
 
-    depths_prepped, colmeans, colsds, rowmeans = pcatransform.prep_data(masked_depths)
+    depths_prepped = transform.prep_data(masked_depths)
 
     mods = [0.01, 0.5, 1.0, 1.5, 2.0]
     chunk_data = []
@@ -241,13 +239,9 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
     for i, indices in enumerate(chunk_indices):
         logging.info("Processing chunk {} of {}".format(i+1, len(chunk_indices)))
         depths_prepped_chunk = depths_prepped[:, indices]
-        rowmeans_chunk = rowmeans[indices]
         raw_depths_chunk = masked_depths[indices, :]
         components, params = _fit_sites(raw_depths_chunk,
                                         depths_prepped_chunk,
-                                        colmeans,
-                                        colsds,
-                                        rowmeans_chunk,
                                         num_components,
                                         mods=mods)
 
@@ -258,5 +252,6 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
 
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
-    pcamodel = model.PCAGenChunkModel(chunk_data, all_params, mods, regions, rowstats=rowmeans, mask=mask)
-    model.save_model(pcamodel, model_save_path)
+    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask)
+    model.save_model(cobaltmodel, model_save_path)
+

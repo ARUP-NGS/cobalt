@@ -277,11 +277,13 @@ def intervals_overlap(region_a, region_b):
         return False
     return not (region_a[1] >= region_b[2] or region_b[1] >= region_a[2])
 
-def x_depth_ratio(regions, depths):
+def x_depth_ratio(regions, depths, min_num_x_regions=10):
     """
     Compute the ratio of depths on the X chromosome to the autosomes
-    :param depths:
-    :return:
+    :param depths: Depths matrix
+    :param regions: List of region objects
+    :param min_num_x_regions: Minimum number of regions on X chromosome required for calc to succeed (otherwise raise InsufficientXRegionException)
+    :return: Ratio of depths of the X chromosome to those on the autosomes
     """
     autosomes = [str(x) for x in range(22)]
 
@@ -292,11 +294,11 @@ def x_depth_ratio(regions, depths):
 
     a_regions = [i for i, r in enumerate(regions) if r[0].replace('chr', '').upper() in autosomes]
 
-    if len(x_regions) < 10:
+    if len(x_regions) < min_num_x_regions:
         raise InsufficientXRegionException()
 
     xdepths = depths[x_regions]
-    autosome_depths =  depths[a_regions]
+    autosome_depths = depths[a_regions]
 
 
     return xdepths.mean() / autosome_depths.mean()

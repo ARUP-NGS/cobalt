@@ -4,16 +4,14 @@
 
 import argparse
 import logging
-from cobalt import __version__ as ver
-from cobalt.training import train
+from cobaltcnv import training
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s --> %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S')
 
-
 if __name__=="__main__":
-    parser = argparse.ArgumentParser("Cobalt CNV caller, version {}".format(ver))
+    parser = argparse.ArgumentParser("Cobalt CNV caller")
 
     subparsers = parser.add_subparsers(help='sub-command help', dest='subparser_name', title='sub-commands')
 
@@ -49,7 +47,7 @@ if __name__=="__main__":
 
     if args.subparser_name == "train":
         print("Training!")
-        train(args.depths, args.save_model, use_depth_mask=not args.no_mask, num_components=args.num_components, max_cv=args.max_cv, chunk_size=args.chunk_size)
+        training.train(args.depths, args.save_model, use_depth_mask=not args.no_mask, num_components=args.num_components, max_cv=args.max_cv, chunk_size=args.chunk_size)
 
     elif args.subparser_name == "predict":
         print("Predicting!")

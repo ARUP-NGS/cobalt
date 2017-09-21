@@ -4,8 +4,8 @@ from setuptools import setup, find_packages
 import os
 import subprocess
 
-install_requires = ['pytest', 'numpy', 'pandas', 'scikit-learn', 'scipy']
-tests_require    = ['coverage']
+install_requires = ['numpy', 'pandas', 'scikit-learn', 'scipy']
+tests_require    = ['pytest', 'coverage']
 
 classifiers = """
 Development Status :: 3 - Beta
@@ -27,7 +27,7 @@ def version_tag():
     version_py = os.path.join(os.path.dirname(__file__), 'version.py')
 
     try:
-        version_git = subprocess.check_output(["git", "describe"]).rstrip()
+        version_git = subprocess.check_output(["git", "describe"]).rstrip().decode(encoding='utf-8')
     except:
         with open(version_py, 'r') as fh:
             version_git = open(version_py).read().strip().split('=')[-1].replace('"', '')
@@ -40,7 +40,7 @@ def version_tag():
 
 if __name__ == '__main__':
     setup(
-        name = 'cobalt',
+        name = 'cobaltcnv',
         version=version_tag(),
         description = 'Cobalt CNV caller',
         author = "Brendan O'Fallon",

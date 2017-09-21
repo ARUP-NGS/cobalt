@@ -1,28 +1,20 @@
 
 
 import numpy as np
-import util
+from cobaltcnv import util
 import logging
 from sklearn.utils.extmath import randomized_svd
 
 def prep_data(depth_matrix, rowmeans=None):
     """
-    Transform a raw depth matrix, as read in by util.read_depths_bed, into something usable as direct input to
-    scipy.decmop.PCA
+    Add 1 to all depths, then take the log and return the transposed matrix
     :param depth_matrix: np.matrix with samples as columns and targets as rows
-    :param mode: Transform mode, must be present in PREP_MODES
-    :return: A new np.matrix containing transposed, transformed values from depth matrix, and column means and column stds
+    :return: A new np.matrix containing transposed, transformed values from depth matrix
     """
 
     depths_prepped = np.log(depth_matrix+1.0) #
-    colsds = np.matrix(np.ones(depth_matrix.shape[1])).reshape((1, depth_matrix.shape[1]))
-    colmeans = np.matrix(np.zeros(depth_matrix.shape[1])).reshape((1, depth_matrix.shape[1]))
-
-    if rowmeans is None:
-        rowmeans = np.zeros(depth_matrix.shape[0])
-
     depths_prepped = np.transpose(depths_prepped)
-    return depths_prepped, colmeans, colsds, rowmeans
+    return depths_prepped
 
 def fit_pca(prepped_depths, num_components=6):
     """
@@ -122,10 +114,6 @@ def fit_single(dmat, components, site, intermediate, id_outliers=True, sample_ma
         adj_zscores = transform_single_site(dmat, components, site=site, orig_scores=intermediate, zscores=True)
 
         transformed_obs = adj_zscores[:, site]
-
-        if dbg:
-            print "Transformed vals: {}".format(transformed_obs.getA1())
-
         if id_outliers and sample_mask:
             raise ValueError('Cant find outliers and use sample mask at the same time')
 
@@ -142,7 +130,7 @@ def fit_single(dmat, components, site, intermediate, id_outliers=True, sample_ma
 
     return a, shape, loc, which
 
-def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, colmeans, colsds, rowmeans, mods, rmoutliers=False):
+def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, mods, rmoutliers=False):
     """
     Estimate distribution parameters for 'normal' (diploid, unadjusted), deletion (normal * 0.5) and
     duplication (normal * 1.5) values independently and return them all as a list of tuples
@@ -160,7 +148,6 @@ def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, colmeans, 
 
     result = []
     for mod in mods:
-        # dmat_prepped[:, site] = (np.log(mod * orig_row + 1.0) - colmeans) / colsds - rowmeans[site]
         dmat_prepped[:, site] = np.log(mod * orig_row + 1.0)
         a, shape, loc, _ = fit_single(dmat_prepped, components, site, intermediate, id_outliers=rmoutliers, sample_mask=None, dbg=False) # site == 5 and (mod == 1.0 or mod == 0.5))
         result.append( (a, shape, loc) )
