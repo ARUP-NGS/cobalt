@@ -277,8 +277,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female):
     prepped_depths = transform.prep_data(depths)
     transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
 
-    return construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
-                                           use_male_chrcounts=not assume_female, sites=None)
+    return construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts=not assume_female)
 
 def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None):
     """
