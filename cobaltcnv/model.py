@@ -1,19 +1,42 @@
 
 import pickle
 import logging
+from datetime import datetime
+import sys
+import numpy as np
+
+COBALT_MODEL_VERSION="1.0"
 
 class CobaltModel(object):
 
-    def __init__(self, chunk_data, params, mods, regions, rowstats=None, prep_mode=None, mask=None, opt_sites=None):
+    def __init__(self, chunk_data, params, mods, regions, mask=None, samplecount=None):
+        self.ver = COBALT_MODEL_VERSION
+        self.birthday = datetime.now()
         self.chunk_data = chunk_data
         self.params = params
         self.regions = regions
-        self.rowstats = rowstats
-        self.prep_mode = prep_mode
         self.mask = mask
         self.mods = mods
-        self.opt_sites = opt_sites
+        self.samplecount = samplecount
 
+    def describe(self, outputfh=None):
+        """
+        Write a short descriptive message about this model to the given file handle, or stdout
+        """
+        if outputfh is None:
+            outputfh = sys.stdout
+
+        outputfh.write("Cobalt CNV Calling model v{}, created on {}\n".format(self.ver, self.birthday.strftime("%Y-%m-%d %H:%M:%S")))
+        outputfh.write("Total targets: {}\n".format(len(self.regions)))
+        if self.mask is None:
+            outputfh.write("Masked targets:   0\n")
+        else:
+            outputfh.write("Masked targets:   {}\n".format(int(np.sum(1.0 - self.mask))))
+
+        if self.samplecount is None:
+            outputfh.write("Training samples: Unknown")
+        else:
+            outputfh.write("Training samples: {}\n".format(self.samplecount))
 
 def save_model(model, dest_path):
     """ Pickle a CNVModel and dump it to a file """

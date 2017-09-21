@@ -51,5 +51,5 @@ if __name__ == '__main__':
         tests_require = tests_require,
         packages = find_packages(),
         install_requires = install_requires,
-        scripts=['bin/cobalt'],
+        scripts=['bin/cobalt', 'bin/covcounter'],
     )

@@ -39,9 +39,14 @@ if __name__=="__main__":
     plot.add_argument("--model", "-m", help="Model file")
     plot.add_argument("--site", help="Which site to emit information for (either site index or region string)")
 
+    describe = subparsers.add_parser('desc', help="Emit information about a model")
+    describe.add_argument("--model", "-m", help="Model file", required=True)
+    describe.add_argument("--emit-bed", "-b", help="Emit a BED file with information about each target", action='store_true', default=False)
+    # describe.add_argument("--threshold", help="Max Kullback-Leibler distance between emission distributions for emitted targets", type=float, default=10.0)
+
     # parser.add_argument("--no-rm-outliers", help="Do not remove outlier data points during training", action='store_true', default=False)
 
-    # parser.add_argument("--threshold", help="Max Kullback-Leibler distance between dists for emitted targets", type=float, default=10.0)
+
     # parser.add_argument("--kl", help="Max Kullback-Leibler dist for site optimization, set this to 0.0 to disable site optimization", type=float, default=0.0)
 
     args = parser.parse_args()
@@ -63,6 +68,8 @@ if __name__=="__main__":
     elif args.subparser_name == "plot":
         print("Plotting!")
 
+    elif args.subparser_name == "desc":
+        prediction.emit_site_info(args.model, args.emit_bed)
 
 
 
@@ -70,8 +77,6 @@ if __name__=="__main__":
     #     viz.plot_single_site(args.model, args.site, depths_path=args.depths)
     #
     #
-    # elif args.command[0] == DESCRIBE:
-    #     predictpca.emit_site_info(args.model, threshold=args.threshold, emit_masked_sites=True, output=args.output)
 
     else:
         logging.error("Unrecognized subcommand: {}".format(args.subparser_name))

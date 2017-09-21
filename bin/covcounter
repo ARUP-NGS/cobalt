@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+
+import pysam
+import os
+import multiprocessing as mp
+import argparse
+
+threads = mp.cpu_count()
+
+def filter(r):
+    min_mapq = 20
+    return not (r.is_duplicate
+                or r.is_secondary
+                or r.is_supplementary
+                or r.is_unmapped
+                or (not r.is_proper_pair)
+                or r.mapping_quality < min_mapq)
+
+def count(args):
+    """
+    Compute read counts over a list of regions for a single BAM file
+    :param args: Tuple of (path to bam file, list of regions)
+    :return: List of read counts, 1 entry for each region in input list
+    """
+    bampath, regions = args
+    alnfile = pysam.AlignmentFile(bampath)
+    counts = [alnfile.count(region[0], region[1], region[2], read_callback=filter) for region in regions]
+    alnfile.close()
+    return counts
+
+def coverage(bed, bams, threads):
+
+    pool = mp.Pool( threads )
+    print("#chrom\tstart\tend\t" + "\t".join([os.path.basename(b) for b in bams]))
+    chunksize = 250
+    chunks = []
+    for line in open(bed):
+        if line.startswith("#"):
+            continue
+        region = line.strip().split("\t")
+        region[1] = int(region[1])
+        region[2] = int(region[2])
+        chunks.append(region)
+        if len(chunks) >= chunksize:
+            counts = pool.map(count, zip(bams, [chunks for _ in range(len(bams))]))
+            for i, region in enumerate(chunks):
+                print("{}\t{}\t{}\t".format(region[0], region[1], region[2]) + "\t".join(str(c[i]) for c in counts))
+            chunks = []
+
+    #Don't forget last few
+    counts = pool.map(count, zip(bams, [chunks for _ in range(len(bams))]))
+    for i, region in enumerate(chunks):
+        print("{}\t{}\t{}\t".format(region[0], region[1], region[2]) + "\t".join(str(c[i]) for c in counts))
+
+if __name__=="__main__":
+    parser = argparse.ArgumentParser("Simple coverage counter")
+    parser.add_argument("--bed", help="BED file with regions to count", required=True)
+    parser.add_argument("--bams", help="One or more BAM files" , nargs='+')
+    parser.add_argument("--threads", help="Number of threads to use", type=int, default=2)
+    args = parser.parse_args()
+    coverage(args.bed, args.bams, args.threads)

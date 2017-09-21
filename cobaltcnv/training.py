@@ -191,7 +191,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
     """
 
     logging.info("Starting new training run using depths from {}".format(depths_path))
-    depth_matrix, sample_name = util.read_data_bed(depths_path)
+    depth_matrix, sample_names = util.read_data_bed(depths_path)
     regions = util.read_regions(depths_path)
 
     if max_cv is not None:
@@ -202,7 +202,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
             logging.error("All samples have CV > {} !".format(max_cv))
             return
 
-        if (len(sample_name)-sum(which))<num_components:
+        if (len(sample_names)-sum(which))<num_components:
             logging.error("Need at least as many passing samples as components ({} samples passed CV filter, {} components)".format(sum(which), num_components))
             return
 
@@ -211,7 +211,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
 
         for i in range(len(cvs)):
             if which[i]:
-                logging.info("Removing sample {} (CV={:.4f})".format(sample_name[i], cvs[i]))
+                logging.info("Removing sample {} (CV={:.4f})".format(sample_names[i], cvs[i]))
 
         depth_matrix = util.remove_samples_max_cv(depth_matrix, max_cv=max_cv)
 
@@ -252,6 +252,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
 
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
-    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask)
+
+    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask, samplecount=len(sample_names))
     model.save_model(cobaltmodel, model_save_path)
 

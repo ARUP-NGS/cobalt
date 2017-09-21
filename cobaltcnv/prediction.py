@@ -86,41 +86,35 @@ def gaussian_kullback_leibler(mu1, sig1, mu2, sig2):
     """
     return np.log(sig2 / sig1) + (sig1*sig1 + np.power(mu1-mu2, 2.0))/(2.0*sig2*sig2) - 0.5
 
-def emit_site_info(model_path, threshold=10.0, emit_masked_sites=False, output=None):
-    pcamodel = model.load_model(model_path)
+def emit_site_info(model_path, emit_bed=False):
+    cmodel = model.load_model(model_path)
 
-    if output is None:
-        output = sys.stdout
-    else:
-        output = open(output, "w")
+    if not emit_bed:
+        cmodel.describe() # Emits to sys.stdout by default
+        return
 
-    if hasattr(pcamodel, 'mask'):
-        mask = pcamodel.mask
+    if hasattr(cmodel, 'mask'):
+        mask = cmodel.mask
     else:
         mask = None
 
-    # masked_regions = pcamodel.regions
-    # if mask is not None:
-    #     masked_regions = [r for i,r in enumerate(pcamodel.regions) if mask[i]]
-
-    dip_index = int(len(pcamodel.params) / 2)
+    modelhmm = _create_hmm(cmodel.params, cmodel.mods, 0.05, 0.05)
+    dip_index = next((i, em) for i, em in enumerate(modelhmm.em) if em.copy_number() == 2)[0]
+    # dip_index = int(len(cmodel.params) / 2)
 
     mask_index = 0
-    for nomask_index, region in enumerate(pcamodel.regions):
+    for nomask_index, region in enumerate(cmodel.regions):
         if mask is not None and not mask[nomask_index]:
-            if emit_masked_sites:
-                output.write("{}\t{}\t{}\t{}\n".format(region[0], region[1], region[2], "0"))
+            print("{}\t{}\t{}\t{}".format(region[0], region[1], region[2], "MASKED"))
         else:
-            dip_mu = pcamodel.params[dip_index][mask_index][1]
-            dip_sigma = pcamodel.params[dip_index][mask_index][2]
-            del_mu = pcamodel.params[dip_index-1][mask_index][1]
-            del_sigma = pcamodel.params[dip_index - 1][mask_index][2]
+            dip_mu = cmodel.params[dip_index][mask_index][1]
+            dip_sigma = cmodel.params[dip_index][mask_index][2]
+            del_mu = cmodel.params[dip_index-1][mask_index][1]
+            del_sigma = cmodel.params[dip_index - 1][mask_index][2]
             divergence = gaussian_kullback_leibler(del_mu, del_sigma, dip_mu, dip_sigma)
-            if divergence < threshold:
-                output.write("{}\t{}\t{}\t{:.3}\n".format(region[0], region[1], region[2], divergence))
+            print("{}\t{}\t{}\t{:.4}".format(region[0], region[1], region[2], divergence))
             mask_index += 1
 
-    output.close()
 
 def segment_cnvs(regions, stateprobs, modelhmm):
     """
@@ -193,11 +187,11 @@ def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
         flt_params.append([param for region, param in zip(regions, ps) if region[0] in chroms_to_include])
     return flt_regions, flt_depths, flt_params
 
-def construct_hmms_call_states(pcamodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, sites=None):
+def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts):
     """
     Construct HMMs using information stored in model, compute state probabilities for all targets, and
     run segmentation algorithm on state probability matrices to generate CNV calls.
-    :param pcamodel: PCAFlexChunk model with emission distribution params
+    :param cmodel: PCAFlexChunk model with emission distribution params
     :param regions: List of regions with mask applied (all masked regions must be removed so that this is equal in length to the parameters in pcamodel)
     :param transformed_depths: Sample depths transformed via prepping / PCA transform
     :param alpha: Transition matrix parameter a
@@ -206,12 +200,12 @@ def construct_hmms_call_states(pcamodel, regions, transformed_depths, alpha, bet
     :return: List of CNVCall objects
     """
 
-    autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, pcamodel.params, util.AUTOSOMES)
-    x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, pcamodel.params, util.X_CHROM)
-    y_regions, y_depths, y_params = _filter_regions_by_chroms(pcamodel.regions, transformed_depths, pcamodel.params, util.Y_CHROM)
+    autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
+    x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
+    y_regions, y_depths, y_params = _filter_regions_by_chroms(cmodel.regions, transformed_depths, cmodel.params, util.Y_CHROM)
 
     logging.info("Determining autosomal copy number states and qualities")
-    autosomal_model = _create_hmm(autosomal_params, pcamodel.mods, alpha, beta)
+    autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
     autosomal_state_probs = autosomal_model.forward_backward(autosomal_depths)[1:]
     autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model)
 
@@ -223,7 +217,7 @@ def construct_hmms_call_states(pcamodel, regions, transformed_depths, alpha, bet
             states_to_use = None
 
         logging.info("Determining X chromosome copy number states and qualities")
-        x_model = _create_hmm(x_params, pcamodel.mods, alpha, beta, states_to_use=states_to_use)
+        x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use)
         x_state_probs = x_model.forward_backward(x_depths)[1:]
         x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model)
     else:
@@ -233,7 +227,7 @@ def construct_hmms_call_states(pcamodel, regions, transformed_depths, alpha, bet
     y_cnvs = []
     if len(y_regions)>0 and use_male_chrcounts:
         logging.info("Determining Y chromosome copy number states and qualities")
-        y_model = _create_hmm(y_params, pcamodel.mods, alpha, beta, states_to_use=[0,2,4])
+        y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
         y_state_probs = y_model.forward_backward(y_depths)[1:]
         y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model)
     else:
@@ -241,28 +235,6 @@ def construct_hmms_call_states(pcamodel, regions, transformed_depths, alpha, bet
             logging.info("No Y chromosome regions found, not calling CNVs on X chromosome")
         else:
             logging.info("Not calling CNVs on Y (sample is female)")
-
-    if sites is not None and len(sites)>0:
-        dbg_margin = 3
-        dbg_start = max(0, min(sites)-dbg_margin)
-        dbg_end = max(sites)+dbg_margin
-        for site in range(dbg_start, dbg_end):
-            if site < len(autosomal_regions):
-                reg = autosomal_regions
-                sidx = site
-                probs = autosomal_state_probs
-            elif site < len(autosomal_regions) + len(x_regions):
-                reg = x_regions
-                sidx = site - len(autosomal_regions)
-                probs = x_state_probs
-            else:
-                reg = y_regions
-                sidx = site - len(autosomal_regions) - len(x_regions)
-                probs = y_state_probs
-            print("{}:{}-{}".format(reg[sidx][0], reg[sidx][1], reg[sidx][2]) + "\t[" + " ".join(["{:.4f}".format(v) for v in probs[sidx]]) + "]")
-
-
-
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
