@@ -4,7 +4,7 @@
 
 import argparse
 import logging
-from cobaltcnv import training
+from cobaltcnv import training, prediction
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s --> %(message)s',
@@ -17,8 +17,8 @@ if __name__=="__main__":
 
     train = subparsers.add_parser('train', help="Create a new CNV calling model from a depth file")
 
-    train.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths")
-    train.add_argument("--save-model", "-o", help="Path to which trained model should be saved")
+    train.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
+    train.add_argument("--save-model", "-o", help="Path to which trained model should be saved", required=True)
     train.add_argument("--num-components", help="Number of components to subtract during training", type=int,
                         default=6)
     train.add_argument("--no-mask", help="Turn off site masking", action='store_true', default=False)
@@ -26,7 +26,8 @@ if __name__=="__main__":
     train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
-    predict.add_argument("--model", "-m", help="Model file to use for prediction")
+    predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
+    predict.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
     predict.add_argument("--min-qual", "-q", help="Minimum quality to emit CNV call", type=float, default=0.80)
     predict.add_argument("-o", "--output", help="Output path for prediction results", default=None)
     predict.add_argument("-a", "--alpha", help="Transition parameter for HMM", default=0.05, type=float)
@@ -46,26 +47,23 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     if args.subparser_name == "train":
-        print("Training!")
         training.train(args.depths, args.save_model, use_depth_mask=not args.no_mask, num_components=args.num_components, max_cv=args.max_cv, chunk_size=args.chunk_size)
 
     elif args.subparser_name == "predict":
-        print("Predicting!")
+        assume_female = None
+        if args.sex is not None:
+            assume_female = args.sex == 'F'
+        prediction.predict(args.model, args.depths,
+                           output_path=args.output,
+                           min_quality=args.min_qual,
+                           alpha=args.alpha,
+                           beta=args.beta,
+                           assume_female=assume_female)
 
     elif args.subparser_name == "plot":
         print("Plotting!")
 
-        # assume_female = None
-        # if args.sex is not None:
-        #     assume_female = args.sex == 'F'
-        # predictpca.predict(args.model, args.depths,
-        #                    output_path=args.output,
-        #                    truncate_depths=True,
-        #                    min_quality=args.min_qual,
-        #                    alpha=args.alpha,
-        #                    beta=args.beta,
-        #                    regionstr=args.site,
-        #                    assume_female=assume_female)
+
 
 
     # elif args.command[0] == PLOT:

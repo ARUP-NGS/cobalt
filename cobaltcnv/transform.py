@@ -170,17 +170,8 @@ def transform_by_genchunks(depths, cmodel):
     """
     transformed_depths = np.zeros(depths.shape[1])
     for i, chunk_info in enumerate(cmodel.chunk_data):
-        if len(chunk_info)==2:
-            indices, components = chunk_info
-            opt_sites = {}
-        else:
-            indices, components, opt_sites = chunk_info
-
+        indices, components = chunk_info
         transformed_depths[indices] = transform_raw(depths[:, indices], components=components, zscores=True)
-        for site, comps in opt_sites.iteritems():
-            result = transform_raw(depths[:, indices], components=comps, zscores=True)
-            global_site = indices[site]
-            transformed_depths[global_site] = result[0, site]
 
     return transformed_depths
 
