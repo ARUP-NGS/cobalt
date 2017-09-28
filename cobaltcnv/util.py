@@ -19,8 +19,15 @@ CHROM_COUNTS_MALE[X_CHROM] = 1
 CHROM_COUNTS_MALE[Y_CHROM] = 1
 
 # Locations of pseudoautosomal regions on X chromosome, see https://www.ncbi.nlm.nih.gov/grc/human
-X_PAR1_GRCh37 = [60001, 2699520]
-X_PAR2_GRCh37 = [154931044, 155260560]
+X_PAR1_HG19 = [60001, 2699520]
+X_PAR2_HG19 = [154931044, 155260560]
+
+X_PAR1_HG38 = [10001, 2781479]
+X_PAR2_HG38 = [155701383, 156030895]
+
+class ReferenceGenomes(object):
+    HG19="hg19"
+    HG38="hg38"
 
 class InsufficientXRegionException(BaseException):
     pass
@@ -277,20 +284,30 @@ def intervals_overlap(region_a, region_b):
         return False
     return not (region_a[1] >= region_b[2] or region_b[1] >= region_a[2])
 
-def x_depth_ratio(regions, depths, min_num_x_regions=10):
+def x_depth_ratio(regions, depths, genome, min_num_x_regions=10):
     """
     Compute the ratio of depths on the X chromosome to the autosomes
     :param depths: Depths matrix
     :param regions: List of region objects
     :param min_num_x_regions: Minimum number of regions on X chromosome required for calc to succeed (otherwise raise InsufficientXRegionException)
+    :param genome: Reference genome build to use, needed for locations of PAR regions
     :return: Ratio of depths of the X chromosome to those on the autosomes
     """
     autosomes = [str(x) for x in range(22)]
 
+    if genome==ReferenceGenomes.HG19:
+        xpar1 = X_PAR1_HG19
+        xpar2 = X_PAR2_HG19
+    elif genome==ReferenceGenomes.HG38:
+        xpar1 = X_PAR1_HG38
+        xpar2 = X_PAR2_HG38
+    else:
+        raise ValueError('Unrecognized reference genome: {}'.format(genome))
+
     # Dont include PAR regions
     x_regions = [i for i,r in enumerate(regions)
-                 if r[0].replace('chr', '').upper()=='X'
-                 and not (intervals_overlap(r, X_PAR1_GRCh37) or intervals_overlap(r, X_PAR2_GRCh37))]
+                 if r[0].replace('chr', '').upper() =='X'
+                 and not (intervals_overlap(r, xpar1) or intervals_overlap(r, xpar2))]
 
     a_regions = [i for i, r in enumerate(regions) if r[0].replace('chr', '').upper() in autosomes]
 
@@ -302,42 +319,3 @@ def x_depth_ratio(regions, depths, min_num_x_regions=10):
 
 
     return xdepths.mean() / autosome_depths.mean()
-
-def inflate_x_depths(depths, regions):
-    """
-    Multiply depths on the X chromosome (but not those in the PAR regions) by 2
-    :param depths:
-    :param regions:
-    :return:
-    """
-    mul = [2 if r[0].replace('chr', '').upper() == 'X'
-             and not (intervals_overlap(r, X_PAR1_GRCh37) or intervals_overlap(r, X_PAR2_GRCh37))
-           else 1
-           for i, r in enumerate(regions)]
-
-    mul = np.reshape(np.array(mul), depths.shape)
-    return np.multiply(mul, depths) # Ensure elementwise multiplication
-
-
-def inflate_male_depths(depths, sample_names, regions):
-    """
-    Return a new depths matrix with depths on X chromosomes in males multiplied by 2
-    :param depths:
-    :param regions:
-    :return:
-    """
-    result = np.zeros(depths.shape)
-    for i in range(depths.shape[1]):
-        d = depths[:, i]
-        xratio = x_depth_ratio(regions, d)
-        logging.debug("Sample: {} X/A ratio: {}".format(sample_names[i], xratio))
-        if xratio < 0.75:
-            logging.info("Feminizing depths for sample: {} (X/A ratio: {})".format(sample_names[i], xratio))
-            adj_depths = inflate_x_depths(d, regions)
-        else:
-            adj_depths = d
-
-        result[:, i] = adj_depths.reshape( (adj_depths.shape[0], ))
-
-
-    return result

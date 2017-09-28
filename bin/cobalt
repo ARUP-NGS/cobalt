@@ -34,6 +34,7 @@ if __name__=="__main__":
     predict.add_argument("-a", "--alpha", help="Transition parameter for HMM", default=0.05, type=float)
     predict.add_argument("-b", "--beta", help="Other transition parameter for HMM", default=0.05, type=float)
     predict.add_argument("--sex", help="Force assume sample sex, (=M, =F)", choices=['M', 'F'])
+    predict.add_argument("-g", "--genome", help="Reference genome build, must be one of hg19 or hg38", choices=("hg19", "hg38"), default="hg19")
 
 
     plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")

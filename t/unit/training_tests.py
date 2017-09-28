@@ -26,7 +26,7 @@ def test_model_load_predict(simple_model, sample_depths_100):
     cmodel = model.load_model(simple_model)
     sample_depths, _ = util.read_data_bed(sample_depths_100)
     depths = np.matrix(sample_depths[:, 0]).reshape((sample_depths.shape[0], 1))
-    cnvs = prediction.call_cnvs(cmodel, depths, 0.05, 0.05, assume_female=None)
+    cnvs = prediction.call_cnvs(cmodel, depths, 0.05, 0.05, assume_female=None, genome=util.ReferenceGenomes.HG19)
     assert len(cnvs)==2
     assert cnvs[0].copynum == 1
     assert cnvs[0].start == 880354

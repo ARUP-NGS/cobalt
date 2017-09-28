@@ -246,7 +246,7 @@ def has_x_regions(regions):
     """
     return any(r[0] == 'X' or r[0] == 'chrX' for r in regions)
 
-def call_cnvs(cmodel, depths, alpha, beta, assume_female):
+def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
     :param cmodel: CobaltModel object
@@ -257,7 +257,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female):
     :return: List of CNVCall objects representing all calls
     """
     if assume_female is None and has_x_regions(cmodel.regions):
-        xratio = util.x_depth_ratio(cmodel.regions, depths)
+        xratio = util.x_depth_ratio(cmodel.regions, depths, genome)
         if xratio < 0.75:
             logging.info("Inferred sample sex is male (X / A ratio: {:.3f})".format(xratio))
             assume_female = False
@@ -279,7 +279,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female):
 
     return construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts=not assume_female)
 
-def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None):
+def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19):
     """
     Run the prediction algorithm to identify CNVs from a test sample, using eigenvectors and parameters stored in a model file
     :param model_path: Path to model file, generated via a call to trainpca.train(...)
@@ -303,7 +303,7 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
     logging.info("Beginning prediction run with alpha = {}, beta = {} and min_output_quality = {}".format(alpha, beta,
                                                                                                           min_quality))
 
-    cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female)
+    cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome)
 
     output_fh = sys.stdout
     if output_path is not None:
