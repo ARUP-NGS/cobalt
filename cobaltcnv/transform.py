@@ -22,7 +22,7 @@ def fit_pca(prepped_depths, num_components=6):
     :param depth_matrix: Matrix of depths, with rows as samples and columns as targets
     :return: Matrix of components, with num_components columns and [target count] rows
     """
-    colmeans = np.mean(prepped_depths, axis=0)
+    colmeans = np.median(prepped_depths, axis=0)
     centered = prepped_depths - colmeans
     U, S, V = randomized_svd(centered, n_components=num_components, n_oversamples=10)
     return np.matrix(V).T

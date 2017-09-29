@@ -198,7 +198,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
 
     if use_depth_mask:
         logging.info("Creating target mask")
-        mask = util.create_region_mask(depth_matrix, max_coeff_var=0.6, min_depth=25.0)
+        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=25.0)
     else:
         logging.info("Skipping mask creation")
         mask = np.ones(shape=(depth_matrix.shape[0], )) == 1 # Convert 1 to True
