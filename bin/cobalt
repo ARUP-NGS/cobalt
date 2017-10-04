@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-
 import argparse
 import logging
 import sys
@@ -35,11 +34,13 @@ if __name__=="__main__":
     predict.add_argument("-b", "--beta", help="Other transition parameter for HMM", default=0.05, type=float)
     predict.add_argument("--sex", help="Force assume sample sex, (=M, =F)", choices=['M', 'F'])
     predict.add_argument("-g", "--genome", help="Reference genome build, must be one of hg19 or hg38", choices=("hg19", "hg38"), default="hg19")
+    predict.add_argument("--vcf", help="Emit VCF output (requires -r reference fasta)", default=False, action='store_true')
+    predict.add_argument("-r", "--reference", help="Path to reference genome fasta")
 
 
-    plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
-    plot.add_argument("--model", "-m", help="Model file")
-    plot.add_argument("--site", help="Which site to emit information for (either site index or region string)")
+    # plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
+    # plot.add_argument("--model", "-m", help="Model file")
+    # plot.add_argument("--site", help="Which site to emit information for (either site index or region string)")
 
     describe = subparsers.add_parser('desc', help="Emit information about a model")
     describe.add_argument("--model", "-m", help="Model file", required=True)
@@ -70,20 +71,15 @@ if __name__=="__main__":
                            min_quality=args.min_qual,
                            alpha=args.alpha,
                            beta=args.beta,
-                           assume_female=assume_female)
+                           assume_female=assume_female,
+                           outputvcf=args.vcf,
+                           ref_path=args.reference)
 
     elif args.subparser_name == "plot":
         print("Plotting!")
 
     elif args.subparser_name == "desc":
         prediction.emit_site_info(args.model, args.emit_bed)
-
-
-
-    # elif args.command[0] == PLOT:
-    #     viz.plot_single_site(args.model, args.site, depths_path=args.depths)
-    #
-    #
 
     else:
         logging.error("Unrecognized subcommand: {}".format(args.subparser_name))

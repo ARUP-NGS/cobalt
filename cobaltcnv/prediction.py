@@ -1,10 +1,12 @@
 
 import numpy as np
 import sys
-from cobaltcnv import util, model, hmm, transform
+import os
+from cobaltcnv import util, model, hmm, transform, vcf
+from cobaltcnv import __version__
 from cobaltcnv.distributions import PosDependentSkewNormal
 import logging
-
+import pysam
 
 class CNVCall(object):
     """
@@ -179,6 +181,7 @@ def segment_cnvs(regions, stateprobs, modelhmm):
 
     return cnvs
 
+
 def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
     flt_depths = [depth for region, depth in zip(regions, depths) if region[0] in chroms_to_include]
     flt_regions = [region for region in regions if region[0] in chroms_to_include]
@@ -246,6 +249,9 @@ def has_x_regions(regions):
     """
     return any(r[0] == 'X' or r[0] == 'chrX' for r in regions)
 
+
+
+
 def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
@@ -279,7 +285,38 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome):
 
     return construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts=not assume_female)
 
-def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19):
+def emit_bed(cnv_calls, min_quality, output_fh):
+    """
+    Write the list of CNV calls in BED format to the given output handle
+    :param cnv_calls: CNV call objects
+    :param min_quality: Minimum quality for including call
+    :param output_fh: File-like object to write output to
+    """
+    output_fh.write("#chrom\tstart\tend\tcopy_number\tquality\ttargets\n")
+    for call in cnv_calls:
+        quality = "{:.3f}".format(call.quality)
+        if call.quality >= min_quality:
+            output_fh.write("\t".join([str(s) for s in
+                                   [call.chrom, call.start, call.end, call.copynum, quality,
+                                    call.targets]]) + "\n")
+
+def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
+    """
+    Write the list of CNV calls
+    :param cnv_calls:
+    :param min_quality: Min quality to write CNV
+    :param ref_path: Path to reference fasta
+    :param output_fh: File-like object to write results to
+    """
+    header = vcf.VCF_HEADER.format(ver=__version__, cmd=" ".join(sys.argv), sample=samplename)
+    output_fh.write(header + "\n")
+    ref = pysam.FastaFile(ref_path)
+    for cnv in cnv_calls:
+        if cnv.quality >= min_quality:
+            output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
+
+
+def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19, outputvcf=False, ref_path=None):
     """
     Run the prediction algorithm to identify CNVs from a test sample, using eigenvectors and parameters stored in a model file
     :param model_path: Path to model file, generated via a call to trainpca.train(...)
@@ -305,16 +342,17 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
 
     cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome)
 
+
     output_fh = sys.stdout
     if output_path is not None:
         logging.info("Done computing probabilities, emitting output to {}".format(output_path))
         output_fh = open(output_path, "w")
 
-    output_fh.write("#chrom\tstart\tend\tcopy_number\tquality\ttargets\n")
-    for call in cnv_calls:
-        quality = "{:.3f}".format(call.quality)
-        if call.quality >= min_quality:
-            output_fh.write("\t".join([str(s) for s in
-                                   [call.chrom, call.start, call.end, call.copynum, quality,
-                                    call.targets]]) + "\n")
+    if outputvcf:
+        samplename = os.path.split(depths_path)[1]
+        emit_vcf(cnv_calls, samplename=samplename, ref_path=ref_path, min_quality=min_quality, output_fh=output_fh)
+    else:
+        emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_fh)
+
+
 

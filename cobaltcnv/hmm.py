@@ -141,7 +141,7 @@ class HMM(object):
             sprobs = self.tr[newstate,:].getA1()
         return obs, states
 
-    def viterbi(self, obs, exposure):
+    def viterbi(self, obs, exposure=1.0):
         """
         Run viterbi algorithm to identify the most likely path through the data
         :param obs: List of observations, format depends on what emission distributions are expecting
@@ -171,8 +171,6 @@ class HMM(object):
             for j in range(self.states):
                 probs = [trellis[i] + np.log(self.tr[i,j]) for i in range(self.states)]
                 max_index = np.argmax(probs)
-                #newcol.append(probs[max_index] + eds[j][t]) # np.log(self.em[j].pmf(obs, exposure, site=t)))
-                #newcol.append(probs[max_index] + np.log(self.em[j].pmf(obs[t], exposure, site=t)))
                 newcol.append(probs[max_index] + np.log(eds[j][t]))
                 backtrace_col.append(max_index)
 
