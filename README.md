@@ -50,10 +50,21 @@ may still be impossible, for instance if every background sample has zero depth.
 Number of eigenvectors used to identify major axes of variation in data.
 
 
+We recommend at least 50 samples for training. Most importantly, the samples use for training MUST represent the
+type of conditions used to create the test samples. For instance, training samples should have insert sizes,
+on-target ratios, PCR duplicate percentages, that are typical of the test samples  - and these are just necessary,
+but not sufficient conditions! As with all CNV detection tools, results will be dependent on how similar the training
+samples are to the control samples. Even a few degrees difference during hybridization can have a profound impact
+on the quality of the CNV calls. 
+
+
 ### CNV discovery
 
-Detecting CNVs in a test sample requires a model generated using the training procedure above.
-Typical usage looks like:
+Detecting CNVs in a test sample requires a model generated using the training procedure above. CNVs can
+be written either in BED for VCF (4.2) format. In addition, log2 ratios and supporting information can
+be written to a BED file if desired.
+
+Typical CNV discovery usage looks like:
 
     cobalt predict -m my_new_model.model -d sample_depths.bed -o sample_cnvs.bed
 
@@ -74,6 +85,29 @@ Typical usage looks like:
   6. Targets: Number of BED targets spanned by CNV
 
 
+To write output in VCF, a fasta-formatted and .fai indexed reference genome must be supplied.
+A typical command line might look like:
+
+    cobalt predict -m my_new_model.model -d sample_depths.bed -o sample_cnvs.vcf --vcf --reference my_reference_genome.fasta
+
+
+To write information for ALL (non-masked) targets regardless of CNV status, supply the
+
+    --target-info all_target.info.bed
+
+ option. This will create a BED formatted file with the following columns:
+
+  1. Chrom : Chromosome of target
+  2. Start : Genomic start coordinate of target
+  3. End   : Genomic end coordinate of target
+  4. Mean copy number (Expectation of copy-number value)
+  5. Standard deviation of copy number value
+  6. Log2 ratio of copy number value
+
+ The sixth column is simply log2(expectation of copy number / 2) for the target.
+
+ The all-target info BED file does NOT including information for masked targets. To identify which
+ targets are masked in a given model, use the ```desc -b``` subcommand, described below.
 
 ### Model information
 
@@ -108,3 +142,16 @@ The intent behind this feature is to enable users to create subsets of targeted 
 For instance, when designing a new CNV detection assay it may be desirable to exclude low-confidence regions or masked regions.
 By processing the BED file designers can easily remove masked or poorly performing regions to create a set of high-confidence targets.
 
+
+### Creating a depth BED file for training
+
+The input to the training procedure requires a BED-formatted file containing read depths from the training
+samples. Such a file can be created in several ways, including use of [GATK's DepthOfCoverage tool](https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_gatk_tools_walkers_coverage_DepthOfCoverage.php)
+ or [BEDTools multicov](http://bedtools.readthedocs.io/en/latest/content/tools/multicov.html). We also include a simple
+ and multithreaded utility that creates a properly formatted file called ```covcounter```, which should be installed
+ along with cobalt. To use ```covcounter```, just supply a BED file containing targets to analyze and one or more BAMS to
+ compute coverage for, like this:
+
+     covcounter --bed my_bed_file.bed --bams some_bam.bam other_bam.bam third.bam --threads 24 > control_sample_coverages.bed
+
+ By default ```covcounter``` will use 2 threads, but should scale reasonably well with more.
