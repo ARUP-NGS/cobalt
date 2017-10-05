@@ -190,7 +190,59 @@ def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
         flt_params.append([param for region, param in zip(regions, ps) if region[0] in chroms_to_include])
     return flt_regions, flt_depths, flt_params
 
-def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts):
+def copynumber_expectation(probs):
+    """
+    Given probabilities for a single target (typically computed via forward-backward), take them to be a discrete
+     probability distribution and compute the expectation of the copy number.
+
+    !! This assumes that the copy numbers associated with each state are the INDEX of the state, so that probs[0]
+    describes the probability of having 0 copies, probs[2] is probability of diploid, etc. !!
+
+    :param probs: List of state probabilities
+    :return: Expectation of copy number
+    """
+    return sum( i*p for i,p in enumerate(probs) )
+
+def copynumber_variance(probs):
+    """
+    Return variance in copy number for a single target, computed similarly to
+    :param probs: List of state probabilities
+    :return:
+    """
+    expectation = copynumber_expectation(probs)
+    variance = sum( i*i*p for i,p in enumerate(probs) ) - expectation * expectation
+    return variance
+
+def emit_target_info(region, probs, fh):
+    """
+    Compute the copy-number expectation, stdev and log2 of the expectation for the given probability list
+     and write them to the given file handle
+    :param region: Region tuple (chrom, start, end)
+    :param probs: List of state probabilties
+    :param fh: File-like object to write to
+    """
+    cn_exp = copynumber_expectation(probs)
+    cn_var = copynumber_variance(probs)
+
+    try:
+        cn_stdf = np.sqrt(cn_var)
+        cn_std = "{:.4f}".format(cn_stdf)
+    except:
+        cn_std = "NA"
+
+    try:
+        log2 = "{:.4f}".format(np.log2(cn_exp/2.0))
+    except:
+        log2 = "NA"
+
+    try:
+        cn_exp = "{:.4f}".format(cn_exp)
+    except:
+        cn_exp = "NA"
+
+    fh.write("\t".join([region[0], str(region[1]), str(region[2]), cn_exp, cn_std, log2]) + "\n")
+
+def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, emit_each_target_fh=None):
     """
     Construct HMMs using information stored in model, compute state probabilities for all targets, and
     run segmentation algorithm on state probability matrices to generate CNV calls.
@@ -200,6 +252,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     :param alpha: Transition matrix parameter a
     :param beta: Transition matrix parameter b
     :param use_male_chrcounts: If true, assume there's only one X chromosome and modify potential CN states accordingly
+    :param emit_each_target_fh: If given, must be a file-like object to which target-specific information will be written
     :return: List of CNVCall objects
     """
 
@@ -213,6 +266,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model)
 
     x_cnvs = []
+    x_state_probs = []
     if len(x_regions)>0:
         if use_male_chrcounts:
             states_to_use = [0, 2, 4]
@@ -228,6 +282,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
 
     y_cnvs = []
+    y_state_probs = []
     if len(y_regions)>0 and use_male_chrcounts:
         logging.info("Determining Y chromosome copy number states and qualities")
         y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
@@ -238,6 +293,19 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
             logging.info("No Y chromosome regions found, not calling CNVs on X chromosome")
         else:
             logging.info("Not calling CNVs on Y (sample is female)")
+
+
+    if emit_each_target_fh:
+        logging.info("Writing target specific information")
+        emit_each_target_fh.write("#chrom start end mean_cn std_cn log2\n".replace(" ", "\t"))
+        for region, probs in zip(autosomal_regions, autosomal_state_probs):
+            emit_target_info(region, probs, emit_each_target_fh)
+
+        for region, probs in zip(x_regions, x_state_probs):
+            emit_target_info(region, probs, emit_each_target_fh)
+
+        for region, probs in zip(y_regions, y_state_probs):
+            emit_target_info(region, probs, emit_each_target_fh)
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
@@ -252,7 +320,7 @@ def has_x_regions(regions):
 
 
 
-def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome):
+def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_target_fh=None):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
     :param cmodel: CobaltModel object
@@ -283,7 +351,13 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome):
     prepped_depths = transform.prep_data(depths)
     transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
 
-    return construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts=not assume_female)
+    return construct_hmms_call_states(cmodel,
+                                      regions,
+                                      transformed_depths,
+                                      alpha,
+                                      beta,
+                                      use_male_chrcounts=not assume_female,
+                                      emit_each_target_fh=emit_each_target_fh)
 
 def emit_bed(cnv_calls, min_quality, output_fh):
     """
@@ -316,7 +390,7 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
 
 
-def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19, outputvcf=False, ref_path=None):
+def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19, outputvcf=False, ref_path=None, emit_target_path=None):
     """
     Run the prediction algorithm to identify CNVs from a test sample, using eigenvectors and parameters stored in a model file
     :param model_path: Path to model file, generated via a call to trainpca.train(...)
@@ -325,6 +399,7 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
     :param alpha: Transition probability parameter
     :param beta: Transition probability parameter
     :param assume_female: If true, allow all states on X chrom, if false, only allow homozygous dels and dups on X, if None, try to infer sex
+    :param emit_target_path: Path to which to write per-target info. If None don't write anything
     """
 
     cmodel = model.load_model(model_path)
@@ -339,8 +414,12 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
 
     logging.info("Beginning prediction run with alpha = {}, beta = {} and min_output_quality = {}".format(alpha, beta,
                                                                                                           min_quality))
+    emit_each_target_fh = None
+    if emit_target_path is not None:
+        logging.info("Will write target specific info to {}".format(emit_target_path))
+        emit_each_target_fh = open(emit_target_path, "w")
 
-    cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome)
+    cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome, emit_each_target_fh=emit_each_target_fh)
 
 
     output_fh = sys.stdout
