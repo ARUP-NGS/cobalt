@@ -3,6 +3,8 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##CobaltVersion="{ver}"
 ##CobaltCMD="{cmd}"
 ##INFO=<ID=TARGETS,Number=1,Type=String,Description="Number of targets spanned by variant">
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of variant">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##ALT=<ID=CN4,Description="Copy number allele: 4 copies">
 ##ALT=<ID=CN3,Description="Copy number allele: 3 copies">
 ##ALT=<ID=CN2,Description="Copy number allele: 2 copies">
@@ -24,7 +26,7 @@ def cnv_to_vcf(cnv, ref, passqual):
     else:
         filter = "LOWQUAL"
 
-    info = "TARGETS={},END={}".format(cnv.targets, cnv.end)
+    info = "TARGETS={},END={},SVTYPE=CNV".format(cnv.targets, cnv.end)
     return "\t".join([
         cnv.chrom,
         ".",
