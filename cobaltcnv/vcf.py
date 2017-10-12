@@ -1,4 +1,6 @@
 
+import numpy as np
+
 VCF_HEADER = """##fileformat=VCFv4.2
 ##CobaltVersion="{ver}"
 ##CobaltCMD="{cmd}"
@@ -26,6 +28,11 @@ def cnv_to_vcf(cnv, ref, passqual):
     else:
         filter = "LOWQUAL"
 
+    if cnv.quality >= 1.0:
+        phredqual = 1000
+    else:
+        phredqual = min(1000, int(round(-10.0 * np.log10(1.0 - cnv.quality))))
+
     info = "TARGETS={},END={},SVTYPE=CNV".format(cnv.targets, cnv.end)
     return "\t".join([
         cnv.chrom,
@@ -33,7 +40,7 @@ def cnv_to_vcf(cnv, ref, passqual):
         str(cnv.start+1),
         refbase,
         alt,
-        "{:.3f}".format(cnv.quality),
+        "{}".format(phredqual),
         filter,
         info,
         ".",
