@@ -24,7 +24,7 @@ def cnv_to_vcf(cnv, ref, passqual):
     else:
         filter = "LOWQUAL"
 
-    info = "TARGETS={}".format(cnv.targets)
+    info = "TARGETS={},END={}".format(cnv.targets, cnv.end)
     return "\t".join([
         cnv.chrom,
         ".",

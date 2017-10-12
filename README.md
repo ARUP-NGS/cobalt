@@ -55,7 +55,7 @@ type of conditions used to create the test samples. For instance, training sampl
 on-target ratios, PCR duplicate percentages, that are typical of the test samples  - and these are just necessary,
 but not sufficient conditions! As with all CNV detection tools, results will be dependent on how similar the training
 samples are to the control samples. Even a few degrees difference during hybridization can have a profound impact
-on the quality of the CNV calls. 
+on the quality of the CNV calls.
 
 
 ### CNV discovery
