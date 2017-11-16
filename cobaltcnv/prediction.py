@@ -203,6 +203,7 @@ def copynumber_expectation(probs):
     """
     return sum( i*p for i,p in enumerate(probs) )
 
+
 def copynumber_variance(probs):
     """
     Return variance in copy number for a single target, computed similarly to
@@ -212,6 +213,7 @@ def copynumber_variance(probs):
     expectation = copynumber_expectation(probs)
     variance = sum( i*i*p for i,p in enumerate(probs) ) - expectation * expectation
     return variance
+
 
 def emit_target_info(region, probs, fh):
     """
@@ -241,6 +243,7 @@ def emit_target_info(region, probs, fh):
         cn_exp = "NA"
 
     fh.write("\t".join([region[0], str(region[1]), str(region[2]), cn_exp, cn_std, log2]) + "\n")
+
 
 def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, emit_each_target_fh=None):
     """
@@ -309,6 +312,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
+
 def has_x_regions(regions):
     """
     Returns true if any region in the list has chrom == 'X' or 'chrX'
@@ -316,8 +320,6 @@ def has_x_regions(regions):
     :return:
     """
     return any(r[0] == 'X' or r[0] == 'chrX' for r in regions)
-
-
 
 
 def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_target_fh=None):

@@ -78,7 +78,7 @@ if __name__=="__main__":
                            emit_target_path=args.target_info)
 
     elif args.subparser_name == "plot":
-        print("Plotting!")
+        raise NotImplemented()
 
     elif args.subparser_name == "desc":
         prediction.emit_site_info(args.model, args.emit_bed)
