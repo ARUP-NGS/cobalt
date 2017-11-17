@@ -7,11 +7,6 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##INFO=<ID=TARGETS,Number=1,Type=String,Description="Number of targets spanned by variant">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of variant">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
-##ALT=<ID=CN4,Description="Copy number allele: 4 copies">
-##ALT=<ID=CN3,Description="Copy number allele: 3 copies">
-##ALT=<ID=CN2,Description="Copy number allele: 2 copies">
-##ALT=<ID=CN1,Description="Copy number allele: 1 copy">
-##ALT=<ID=CN0,Description="Copy number allele: 0 copies">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{sample}"""
 
 
@@ -21,7 +16,10 @@ def cnv_to_vcf(cnv, ref, passqual):
     :param cnv:
     """
     refbase = ref.fetch(cnv.chrom, cnv.start, cnv.start+1)
-    alt = "<CN{}>".format(cnv.copynum)
+    if cnv.copynum < 2:
+        alt = "<DEL>"
+    else:
+        alt = "<DUP>"
 
     if cnv.quality > passqual:
         filter = "PASS"
