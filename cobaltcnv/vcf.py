@@ -33,11 +33,11 @@ def cnv_to_vcf(cnv, ref, passqual):
     else:
         phredqual = min(1000, int(round(-10.0 * np.log10(1.0 - cnv.quality))))
 
-    info = "TARGETS={},END={},SVTYPE=CNV".format(cnv.targets, cnv.end)
+    info = "TARGETS={};END={};SVTYPE=CNV;CN={}".format(cnv.targets, cnv.end,cnv.copynum)
     return "\t".join([
         cnv.chrom,
-        ".",
         str(cnv.start+1),
+        ".",
         refbase,
         alt,
         "{}".format(phredqual),
