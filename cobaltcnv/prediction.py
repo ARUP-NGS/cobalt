@@ -376,6 +376,20 @@ def emit_bed(cnv_calls, min_quality, output_fh):
                                    [call.chrom, call.start, call.end, call.copynum, quality,
                                     call.targets]]) + "\n")
 
+def vcf_sort_order(cnv):
+    chrom = cnv.chrom.replace("chr", "")
+    try:
+        return int(chrom)
+    except:
+        if chrom == "X":
+            return 23
+        elif chrom == "Y":
+            return 24
+        elif chrom == "M" or chrom == "MT":
+            return 25
+        else:
+            return 100 + ord(chrom[0])
+
 def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
     """
     Write the list of CNV calls
@@ -387,7 +401,7 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
     header = vcf.VCF_HEADER.format(ver=__version__, cmd=" ".join(sys.argv), sample=samplename)
     output_fh.write(header + "\n")
     ref = pysam.FastaFile(ref_path)
-    for cnv in cnv_calls:
+    for cnv in sorted(cnv_calls, key=vcf_sort_order):
         if cnv.quality >= min_quality:
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
 
