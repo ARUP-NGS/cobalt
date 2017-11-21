@@ -14,11 +14,12 @@ class CNVCall(object):
      or decoding algorithm, as yet TBD
     """
 
-    def __init__(self, chrom, start, end, copynumber, quality, targets):
+    def __init__(self, chrom, start, end, copynumber, ref_ploidy, quality, targets):
         self.chrom = chrom
         self.start = start
         self.end = end
         self.copynum = copynumber
+        self.ref_ploidy = ref_ploidy
         self.quality = quality
         self.targets = targets
 
@@ -118,7 +119,7 @@ def emit_site_info(model_path, emit_bed=False):
             mask_index += 1
 
 
-def segment_cnvs(regions, stateprobs, modelhmm):
+def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
     """
     A very simple segmentation algorithm that just groups calls based on whether or not they
     have the same most-likely copy number state. Quality is the geometric mean of those probabilities
@@ -172,7 +173,7 @@ def segment_cnvs(regions, stateprobs, modelhmm):
         if make_new_cnv:
             if current_cnv is not None:
                 raise ValueError('Cant make a new CNV while one already exists')
-            current_cnv = CNVCall( region[0], region[1], region[2], modelhmm.em[state].copy_number(), 0, 1)
+            current_cnv = CNVCall( region[0], region[1], region[2], modelhmm.em[state].copy_number(), ref_ploidy, 0, 1)
             quals.append(probs[state])
 
     if current_cnv is not None:
@@ -266,20 +267,22 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
     autosomal_state_probs = autosomal_model.forward_backward(autosomal_depths)[1:]
-    autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model)
+    autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model, ref_ploidy=2)
 
     x_cnvs = []
     x_state_probs = []
     if len(x_regions)>0:
         if use_male_chrcounts:
             states_to_use = [0, 2, 4]
+            ref_ploidy = 1
         else:
             states_to_use = None
+            ref_ploidy = 2
 
         logging.info("Determining X chromosome copy number states and qualities")
         x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use)
         x_state_probs = x_model.forward_backward(x_depths)[1:]
-        x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model)
+        x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model, ref_ploidy=ref_ploidy)
     else:
         logging.info("No X chromosome regions found, not calling CNVs on X chromosome")
 
@@ -290,7 +293,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
         logging.info("Determining Y chromosome copy number states and qualities")
         y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
         y_state_probs = y_model.forward_backward(y_depths)[1:]
-        y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model)
+        y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model, ref_ploidy=1)
     else:
         if use_male_chrcounts:
             logging.info("No Y chromosome regions found, not calling CNVs on X chromosome")
@@ -332,19 +335,6 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
     :param assume_female: Use female X chrom model (if false, use male, if None, infer)
     :return: List of CNVCall objects representing all calls
     """
-    if assume_female is None and has_x_regions(cmodel.regions):
-        xratio = util.x_depth_ratio(cmodel.regions, depths, genome)
-        if xratio < 0.75:
-            logging.info("Inferred sample sex is male (X / A ratio: {:.3f})".format(xratio))
-            assume_female = False
-        else:
-            logging.info("Inferred sample sex is female (X / A ratio: {:.3f})".format(xratio))
-            assume_female = True
-    elif assume_female:
-        logging.info("Assuming sample sex is female")
-    else:
-        logging.info("Assuming sample sex is male")
-
     if hasattr(cmodel, 'mask') and cmodel.mask is not None:
         logging.info("Applying region mask, removing {} targets".format( len(cmodel.regions)-sum(cmodel.mask)))
         depths = depths[cmodel.mask, :]
@@ -360,6 +350,24 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
                                       beta,
                                       use_male_chrcounts=not assume_female,
                                       emit_each_target_fh=emit_each_target_fh)
+
+def depths_seem_female(cmodel, depths, genome):
+    """
+    Return True if there are at least a few targets on the X and the ratio of depths on X
+    targets to autosomal targets is > 0.75 (as we would expect if the sample had 2 X chromosomes)
+    :param cmodel: CNV calling model
+    :param depths: Raw read depths
+    :param genome: Genome build, need this for PAR regions, should be one of "hg19" or "hg38"
+    """
+    if not has_x_regions(cmodel.regions):
+        return False # No X regions, so we cant really tell, but return False in case there are Y targets
+    xratio = util.x_depth_ratio(cmodel.regions, depths, genome)
+    female = xratio > 0.75
+    if female:
+        logging.info("Inferred sample sex is female (X / A ratio: {:.3f})".format(xratio))
+    else:
+        logging.info("Inferred sample sex is male (X / A ratio: {:.3f})".format(xratio))
+    return female
 
 def emit_bed(cnv_calls, min_quality, output_fh):
     """
@@ -420,6 +428,13 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
     if emit_target_path is not None:
         logging.info("Will write target specific info to {}".format(emit_target_path))
         emit_each_target_fh = open(emit_target_path, "w")
+
+    if assume_female is None:
+        assume_female = depths_seem_female(cmodel, depths, genome)
+    elif assume_female:
+        logging.info("Assuming sample sex is female")
+    else:
+        logging.info("Assuming sample sex is male")
 
     cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome, emit_each_target_fh=emit_each_target_fh)
 

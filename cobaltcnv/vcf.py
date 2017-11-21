@@ -32,7 +32,21 @@ def cnv_to_vcf(cnv, ref, passqual):
     else:
         phredqual = min(1000, int(round(-10.0 * np.log10(1.0 - cnv.quality))))
 
-    info = "TARGETS={};END={};SVTYPE=CNV;CN={}".format(cnv.targets, cnv.end,cnv.copynum)
+    if cnv.ref_ploidy == 2:
+        if cnv.copynum == 1:
+            gt = "0/1"
+        elif cnv.copynum == 0:
+            gt = "1/1"
+        elif cnv.copynum == 3:
+            gt = "0/1"
+        elif cnv.copynum > 3:
+            gt = "./1"
+        else:
+            gt = "0/0"
+    elif cnv.ref_ploidy == 1:
+        gt = "1"
+
+    info = "TARGETS={};END={};SVTYPE=CNV;CN={}".format(cnv.targets, cnv.end, cnv.copynum)
     return "\t".join([
         cnv.chrom,
         str(cnv.start+1),
@@ -42,6 +56,6 @@ def cnv_to_vcf(cnv, ref, passqual):
         "{}".format(phredqual),
         filter,
         info,
-        ".",
-        "."
+        "GT",
+        gt
     ])
