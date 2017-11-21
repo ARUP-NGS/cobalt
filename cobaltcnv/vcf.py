@@ -7,6 +7,7 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##INFO=<ID=TARGETS,Number=1,Type=String,Description="Number of targets spanned by variant">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of variant">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{sample}"""
 
 
