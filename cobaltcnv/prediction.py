@@ -387,7 +387,7 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
     header = vcf.VCF_HEADER.format(ver=__version__, cmd=" ".join(sys.argv), sample=samplename)
     output_fh.write(header + "\n")
     ref = pysam.FastaFile(ref_path)
-    for cnv in sorted(cnv_calls, key=vcf_sort_order):
+    for cnv in cnv_calls:
         if cnv.quality >= min_quality:
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
 
