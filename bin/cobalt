@@ -37,6 +37,7 @@ if __name__=="__main__":
     predict.add_argument("--vcf", help="Emit VCF output (requires -r reference fasta)", default=False, action='store_true')
     predict.add_argument("-r", "--reference", help="Path to reference genome fasta")
     predict.add_argument("-t", "--target-info", help="Write target-specific information to this path")
+    predict.add_argument("-n", "--name", required=False, type=str, help="Sample name in emitted VCF")
 
 
     # plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
@@ -75,7 +76,8 @@ if __name__=="__main__":
                            assume_female=assume_female,
                            outputvcf=args.vcf,
                            ref_path=args.reference,
-                           emit_target_path=args.target_info)
+                           emit_target_path=args.target_info,
+                           samplename=args.name)
 
     elif args.subparser_name == "plot":
         raise NotImplemented()

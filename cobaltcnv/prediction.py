@@ -400,7 +400,18 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
 
 
-def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, min_quality=0.90, assume_female=None, genome=util.ReferenceGenomes.HG19, outputvcf=False, ref_path=None, emit_target_path=None):
+def predict(model_path,
+            depths_path,
+            alpha=0.05,
+            beta=0.05,
+            output_path=None,
+            min_quality=0.90,
+            assume_female=None,
+            genome=util.ReferenceGenomes.HG19,
+            outputvcf=False,
+            ref_path=None,
+            emit_target_path=None,
+            samplename=None):
     """
     Run the prediction algorithm to identify CNVs from a test sample, using eigenvectors and parameters stored in a model file
     :param model_path: Path to model file, generated via a call to trainpca.train(...)
@@ -414,6 +425,8 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
 
     cmodel = model.load_model(model_path)
     sample_depths, sample_names = util.read_data_bed(depths_path)
+    if samplename is None:
+        samplename = sample_names[0]
     # regions = util.read_regions(depths_path)  # Compare these to the model regions to ensure they're the same??
 
     if sample_depths.shape[1] > 1:
@@ -445,7 +458,6 @@ def predict(model_path, depths_path, alpha=0.05, beta=0.05, output_path=None, mi
         output_fh = open(output_path, "w")
 
     if outputvcf:
-        samplename = os.path.split(depths_path)[1]
         emit_vcf(cnv_calls, samplename=samplename, ref_path=ref_path, min_quality=min_quality, output_fh=output_fh)
     else:
         emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_fh)
