@@ -16,7 +16,7 @@ def prep_data(depth_matrix, rowmeans=None):
     depths_prepped = np.transpose(depths_prepped)
     return depths_prepped
 
-def fit_pca(prepped_depths, num_components=6):
+def fit_svd(prepped_depths, num_components=6):
     """
     Compute and return the eigenvectors associated with the top 'num_components' singular values
     :param depth_matrix: Matrix of depths, with rows as samples and columns as targets
@@ -24,32 +24,33 @@ def fit_pca(prepped_depths, num_components=6):
     """
     colmeans = np.median(prepped_depths, axis=0)
     centered = prepped_depths - colmeans
+    # centered = prepped_depths
     U, S, V = randomized_svd(centered, n_components=num_components, n_oversamples=10)
     return np.matrix(V).T
 
 
 # @util.timeit
-def transform_raw(sample_depths, components=None, comp_mat=None, zscores=True):
+def transform_raw(mat, components=None, comp_mat=None, zscores=True):
     """
-    Mean-center the sample_depths, then apply the PCA transformation to remove first several components
-     Finally, convert resulting values to z-scores and return them
-    Must provide one of components of comp_mat, comp_mat should be pre-computed comp.dot( comp.T) matrix,
-    which can be huge and takes a long time to compute
+    Subtract from the sample_depths matrix the comp_mat matrix, or the inner product of the components with itself
+    Then, optionally return either that result or the sample-level z-scores of the result
+    Must provide one of components (matrix with vectors as columns) or comp_mat, comp_mat should be
+    pre-computed comp.dot( comp.T) matrix,
+
     :param sample_depths: Array of depths for a sinlge sample
     :param components: Optional,Components matrix from PCA
     :param comp_mat: Optional, pre-computed components.dot( components.T ),
-    :return: PCA transformed, z-scored depths
+    :return: Depth matrix with
     """
     if components is None and comp_mat is None:
         raise ValueError("must provide either components or pre-multiplied components matrix")
-
-    mat = sample_depths
 
     if components is None:
         compcomp = comp_mat
     else:
         compcomp = components.dot(components.T)
-    transformed = mat - mat.dot( compcomp )
+    transformed = mat - mat.dot(compcomp)
+
     if not zscores:
         return transformed
     else:

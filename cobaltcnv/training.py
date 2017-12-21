@@ -19,7 +19,7 @@ def _fit_sites(depth_matrix, depths_prepped, num_components, mods):
     :param chunk_start: For logging only, chunk offset to add to reported site index
     :return: Tuple of (components, (params for each entry in mod), {dict of optimized sites -> components})
     """
-    components = transform.fit_pca(depths_prepped, num_components=num_components)
+    components = transform.fit_svd(depths_prepped, num_components=num_components)
 
     transformed = transform.transform_raw_iterative(depths_prepped, components, zscores=False)
     dmat = np.transpose(depth_matrix)
@@ -27,7 +27,6 @@ def _fit_sites(depth_matrix, depths_prepped, num_components, mods):
     num_sites = depths_prepped.shape[1]
 
     for site in range(num_sites):
-
         fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False)
         for i,p in enumerate(fits):
             all_params[i].append(p)

@@ -22,6 +22,11 @@ class CNVCall(object):
         self.ref_ploidy = ref_ploidy
         self.quality = quality
         self.targets = targets
+        self.cn_exp = None # mean of copynumber expectation across targets
+        self.cn_std = None # std dev of copynumber means across targets
+        self.cn_std_mean = None # Mean of copynumber stds for each target
+        self.cn_lower_conf = None # Lower confidence boundary for CN estimate
+        self.cn_upper_conf = None # upper conf boundary
 
     def __str__(self):
         return "CNVCall {}:{}-{} quality: {:.3f} targets: {}".format(self.chrom, self.start, self.end, self.quality, self.targets)
@@ -134,6 +139,8 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
     cnv_state = diploid_state
     current_cnv = None
     quals = [] # Running list of single-target qualities to use for building the final quality
+    means = [] # Ditto for copy-number expectations
+    variances = [] # Ditto for copy-number variances
 
     for j, (region, probs) in enumerate(zip(regions, stateprobs)):
 
@@ -148,6 +155,8 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
                 current_cnv.targets += 1
                 current_cnv.end = region[2]
                 quals.append(probs[state])
+                means.append(copynumber_expectation(probs))
+                variances.append(copynumber_variance(probs))
             else:
                 end_existing_cnv = True
                 make_new_cnv = True
@@ -166,18 +175,32 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
         cnv_state = state
         if end_existing_cnv and current_cnv is not None:
             current_cnv.quality = np.mean(quals)
+            current_cnv.cn_exp = np.mean(means)
+            current_cnv.cn_std = np.std(means)
+            current_cnv.cn_std_mean = np.mean(np.sqrt(variances))
+            current_cnv.cn_lower_conf = np.mean([max(0.0, m - 2.0 * np.sqrt(v)) for m, v in zip(means, variances)])
+            current_cnv.cn_upper_conf = np.mean([m + 2.0 * np.sqrt(v) for m, v in zip(means, variances)])
             cnvs.append(current_cnv)
             quals = []
+            means = []
+            variances = []
             current_cnv = None
 
         if make_new_cnv:
             if current_cnv is not None:
                 raise ValueError('Cant make a new CNV while one already exists')
-            current_cnv = CNVCall( region[0], region[1], region[2], modelhmm.em[state].copy_number(), ref_ploidy, 0, 1)
+            current_cnv = CNVCall(region[0], region[1], region[2], modelhmm.em[state].copy_number(), ref_ploidy, 0, 1)
             quals.append(probs[state])
+            means.append(copynumber_expectation(probs))
+            variances.append(copynumber_variance(probs))
 
     if current_cnv is not None:
         current_cnv.quality = np.mean(quals)
+        current_cnv.cn_exp = np.mean(means)
+        current_cnv.cn_std = np.std(means)
+        current_cnv.cn_std_mean = np.mean(np.sqrt(variances))
+        current_cnv.cn_lower_conf = np.mean([max(0.0, m-2.0*np.std(v)) for m,v in zip(means, variances)])
+        current_cnv.cn_upper_conf = np.mean([m+2.0*np.std(v) for m,v in zip(means, variances)])
         cnvs.append(current_cnv)
 
     return cnvs
@@ -212,11 +235,12 @@ def copynumber_variance(probs):
     :return:
     """
     expectation = copynumber_expectation(probs)
-    variance = sum( i*i*p for i,p in enumerate(probs) ) - expectation * expectation
+    # Floating point issues can occasionally produce a negative variance, so we truncate at 0.0 here
+    variance = max(0.0, sum( i*i*p for i,p in enumerate(probs) ) - expectation * expectation)
     return variance
 
 
-def emit_target_info(region, probs, fh):
+def emit_target_info(region, probs, fh, std=None):
     """
     Compute the copy-number expectation, stdev and log2 of the expectation for the given probability list
      and write them to the given file handle
@@ -243,8 +267,24 @@ def emit_target_info(region, probs, fh):
     except:
         cn_exp = "NA"
 
-    fh.write("\t".join([region[0], str(region[1]), str(region[2]), cn_exp, cn_std, log2]) + "\n")
+    if std is not None:
+        fh.write("\t".join([region[0], str(region[1]), str(region[2]), cn_exp, cn_std, log2, "{:.4f}".format(std)]) + "\n")
+    else:
+        fh.write("\t".join([region[0], str(region[1]), str(region[2]), cn_exp, cn_std, log2]) + "\n")
 
+def standardize_depths(transformed_depths, params):
+    """
+    Subtract from each transformed mean the expected mean of diploid samples at that target, then divide by the
+    standard deviation for that target to produce a target-specific Z-score
+    :param cmodel: CNV calling model
+    :param transformed_depths:
+    :param diploid_index: Index of diploid vals in parameter lists
+    :return: Diploid target-standardized depths
+    """
+
+    diploid_means = np.array([p[1] for p in params])
+    diploid_variances = np.array([p[2] for p in params])
+    return (transformed_depths - diploid_means) / np.sqrt(diploid_variances)
 
 def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, emit_each_target_fh=None):
     """
@@ -260,6 +300,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     :return: List of CNVCall objects
     """
 
+    diploid_state = 2
     autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
     x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
     y_regions, y_depths, y_params = _filter_regions_by_chroms(cmodel.regions, transformed_depths, cmodel.params, util.Y_CHROM)
@@ -267,10 +308,12 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
     autosomal_state_probs = autosomal_model.forward_backward(autosomal_depths)[1:]
+    autosomal_std = standardize_depths(autosomal_depths, autosomal_params[diploid_state])
     autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model, ref_ploidy=2)
 
     x_cnvs = []
     x_state_probs = []
+    x_std = []
     if len(x_regions)>0:
         if use_male_chrcounts:
             states_to_use = [0, 2, 4]
@@ -282,6 +325,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
         logging.info("Determining X chromosome copy number states and qualities")
         x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use)
         x_state_probs = x_model.forward_backward(x_depths)[1:]
+        x_std = standardize_depths(x_depths, x_params[diploid_state])
         x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model, ref_ploidy=ref_ploidy)
     else:
         logging.info("No X chromosome regions found, not calling CNVs on X chromosome")
@@ -289,10 +333,12 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
     y_cnvs = []
     y_state_probs = []
+    y_std = []
     if len(y_regions)>0 and use_male_chrcounts:
         logging.info("Determining Y chromosome copy number states and qualities")
         y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
         y_state_probs = y_model.forward_backward(y_depths)[1:]
+        y_std = standardize_depths(y_depths, y_params[diploid_state])
         y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model, ref_ploidy=1)
     else:
         if use_male_chrcounts:
@@ -303,15 +349,15 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
     if emit_each_target_fh:
         logging.info("Writing target specific information")
-        emit_each_target_fh.write("#chrom start end mean_cn std_cn log2\n".replace(" ", "\t"))
-        for region, probs in zip(autosomal_regions, autosomal_state_probs):
-            emit_target_info(region, probs, emit_each_target_fh)
+        emit_each_target_fh.write("#chrom start end mean_cn std_cn log2 dev\n".replace(" ", "\t"))
+        for region, probs, std in zip(autosomal_regions, autosomal_state_probs, autosomal_std):
+            emit_target_info(region, probs, emit_each_target_fh, std)
 
-        for region, probs in zip(x_regions, x_state_probs):
-            emit_target_info(region, probs, emit_each_target_fh)
+        for region, probs, std in zip(x_regions, x_state_probs, x_std):
+            emit_target_info(region, probs, emit_each_target_fh, std)
 
-        for region, probs in zip(y_regions, y_state_probs):
-            emit_target_info(region, probs, emit_each_target_fh)
+        for region, probs, std in zip(y_regions, y_state_probs, y_std):
+            emit_target_info(region, probs, emit_each_target_fh, std)
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
@@ -341,6 +387,8 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
         regions = [r for r,m in zip(cmodel.regions, cmodel.mask) if m]
 
     prepped_depths = transform.prep_data(depths)
+    # colmeans = np.median(prepped_depths, axis=1)
+    # centered = prepped_depths - colmeans # HOW IS THIS SOMEHOW NOT REQUIRED??
     transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
 
     return construct_hmms_call_states(cmodel,
