@@ -19,15 +19,15 @@ CHROM_COUNTS_MALE[X_CHROM] = 1
 CHROM_COUNTS_MALE[Y_CHROM] = 1
 
 # Locations of pseudoautosomal regions on X chromosome, see https://www.ncbi.nlm.nih.gov/grc/human
-X_PAR1_HG19 = [60001, 2699520]
-X_PAR2_HG19 = [154931044, 155260560]
+X_PAR1_B37 = [60001, 2699520]
+X_PAR2_B37 = [154931044, 155260560]
 
-X_PAR1_HG38 = [10001, 2781479]
-X_PAR2_HG38 = [155701383, 156030895]
+X_PAR1_B38 = [10001, 2781479]
+X_PAR2_B38 = [155701383, 156030895]
 
 class ReferenceGenomes(object):
-    HG19="hg19"
-    HG38="hg38"
+    B37 = "b37"
+    B38 = "b38"
 
 class InsufficientXRegionException(BaseException):
     pass
@@ -312,12 +312,12 @@ def x_depth_ratio(regions, depths, genome, min_num_x_regions=10):
     """
     autosomes = [str(x) for x in range(22)]
 
-    if genome==ReferenceGenomes.HG19:
-        xpar1 = X_PAR1_HG19
-        xpar2 = X_PAR2_HG19
-    elif genome==ReferenceGenomes.HG38:
-        xpar1 = X_PAR1_HG38
-        xpar2 = X_PAR2_HG38
+    if genome==ReferenceGenomes.B37:
+        xpar1 = X_PAR1_B37
+        xpar2 = X_PAR2_B37
+    elif genome==ReferenceGenomes.B38:
+        xpar1 = X_PAR1_B38
+        xpar2 = X_PAR2_B38
     else:
         raise ValueError('Unrecognized reference genome: {}'.format(genome))
 

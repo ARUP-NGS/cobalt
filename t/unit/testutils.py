@@ -77,11 +77,11 @@ def test_xratio():
 
     depths = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 25.0])
 
-    xratio = util.x_depth_ratio(regions, depths, genome=util.ReferenceGenomes.HG19, min_num_x_regions=3)
+    xratio = util.x_depth_ratio(regions, depths, genome=util.ReferenceGenomes.B37, min_num_x_regions=3)
     assert xratio == 1.0
 
     depths = np.array([10.0, 10.0, 5.0, 5.0, 5.0, 17.23])
-    xratio = util.x_depth_ratio(regions, depths, genome=util.ReferenceGenomes.HG19, min_num_x_regions=3)
+    xratio = util.x_depth_ratio(regions, depths, genome=util.ReferenceGenomes.B37, min_num_x_regions=3)
     assert xratio == 0.5
 
 def test_interval_overlap():
