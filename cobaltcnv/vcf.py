@@ -7,7 +7,10 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##INFO=<ID=TARGETS,Number=1,Type=String,Description="Number of targets spanned by variant">
 ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of variant">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
-##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number">
+##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number estimate">
+##INFO=<ID=LOG2,Number=1,Type=Float,Description="Log2 adjusted deviation in read depth">
+##INFO=<ID=LOG2UPPER,Number=1,Type=Float,Description="Upper confidence bound for log2">
+##INFO=<ID=LOG2LOWER,Number=1,Type=Float,Description="Lower confidence bound for log2">
 #CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{sample}"""
 
 
