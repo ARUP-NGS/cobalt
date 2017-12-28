@@ -180,7 +180,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
             logging.error("All samples have CV > {} !".format(max_cv))
             return
 
-        if (len(sample_names)-sum(which))<num_components:
+        if (len(sample_names)-np.sum(which))<num_components:
             logging.error("Need at least as many passing samples as components ({} samples passed CV filter, {} components)".format(sum(which), num_components))
             return
 

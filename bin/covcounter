@@ -3,12 +3,12 @@
 import pysam
 import os
 import multiprocessing as mp
+from functools import partial
 import argparse
 
 threads = mp.cpu_count()
 
-def filter(r):
-    min_mapq = 20
+def filter(r, min_mapq):
     return not (r.is_duplicate
                 or r.is_secondary
                 or r.is_supplementary
@@ -16,7 +16,7 @@ def filter(r):
                 or (not r.is_proper_pair)
                 or r.mapping_quality < min_mapq)
 
-def count(args):
+def count(args, readfilter):
     """
     Compute read counts over a list of regions for a single BAM file
     :param args: Tuple of (path to bam file, list of regions)
@@ -24,16 +24,18 @@ def count(args):
     """
     bampath, regions = args
     alnfile = pysam.AlignmentFile(bampath)
-    counts = [alnfile.count(region[0], region[1], region[2], read_callback=filter) for region in regions]
+    counts = [alnfile.count(region[0], region[1], region[2], read_callback=readfilter) for region in regions]
     alnfile.close()
     return counts
 
-def coverage(bed, bams, threads):
+def coverage(bed, bams, threads, min_mapq):
 
     pool = mp.Pool( threads )
     print("#chrom\tstart\tend\t" + "\t".join([os.path.basename(b) for b in bams]))
     chunksize = 250
     chunks = []
+    readfilter = partial(filter, min_mapq=min_mapq)
+    countfunc = partial(count, readfilter=readfilter)
     for line in open(bed):
         if line.startswith("#"):
             continue
@@ -42,13 +44,13 @@ def coverage(bed, bams, threads):
         region[2] = int(region[2])
         chunks.append(region)
         if len(chunks) >= chunksize:
-            counts = pool.map(count, zip(bams, [chunks for _ in range(len(bams))]))
+            counts = pool.map(countfunc, zip(bams, [chunks for _ in range(len(bams))]))
             for i, region in enumerate(chunks):
                 print("{}\t{}\t{}\t".format(region[0], region[1], region[2]) + "\t".join(str(c[i]) for c in counts))
             chunks = []
 
     #Don't forget last few
-    counts = pool.map(count, zip(bams, [chunks for _ in range(len(bams))]))
+    counts = pool.map(countfunc, zip(bams, [chunks for _ in range(len(bams))]))
     for i, region in enumerate(chunks):
         print("{}\t{}\t{}\t".format(region[0], region[1], region[2]) + "\t".join(str(c[i]) for c in counts))
 
@@ -57,5 +59,6 @@ if __name__=="__main__":
     parser.add_argument("--bed", help="BED file with regions to count", required=True)
     parser.add_argument("--bams", help="One or more BAM files" , nargs='+')
     parser.add_argument("--threads", help="Number of threads to use", type=int, default=2)
+    parser.add_argument("--min-mapq", "-m", help="Minimum mapping quality of reads to count", type=int, default=10)
     args = parser.parse_args()
-    coverage(args.bed, args.bams, args.threads)
+    coverage(args.bed, args.bams, args.threads, args.min_mapq)
