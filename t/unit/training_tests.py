@@ -10,7 +10,7 @@ def test_model_train_save_load(tmpdir, bknd_depths_100):
     training.train(bknd_depths_100,
                    modelpath,
                    use_depth_mask=True,
-                   num_components=6,
+                   var_cutoff=0.95,
                    max_cv=1.0,
                    chunk_size=100)
 

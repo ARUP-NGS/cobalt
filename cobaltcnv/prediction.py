@@ -131,6 +131,7 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
     :param regions: List of regions (from util.read_regions)
     :param stateprobs: State probabilities (from hmm.forward_backward)
     :param modelhmm: HMM instance with emission distributions
+    :param ref_ploidy: Reference ploidy, used to construct CNVCall object
     :return: List of CNVCall objects
     """
 

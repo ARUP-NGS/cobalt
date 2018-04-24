@@ -5,7 +5,7 @@ from cobaltcnv import util, model, transform
 import logging
 
 
-def _fit_sites(depth_matrix, depths_prepped, num_components, mods):
+def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods):
     """
     Transform the given data by fitting a PCA to the prepped depths, subtracting the given number of components, iteratively
     predicting the deviations produced by increasing or decreasing the raw depth values at each site, then returning the
@@ -15,11 +15,11 @@ def _fit_sites(depth_matrix, depths_prepped, num_components, mods):
     :param colmeans: Values to subtract from each column of the raw depth matrix, typically from 'prep_mode'
     :param colsds: Column std. devs to divide each column
     :param rowmeans: Values to subtract from each target (row)
-    :param num_components: Number of PCA components to subtract
+    :param var_cutoff: Remove components amounting to at least this amount of variance
     :param chunk_start: For logging only, chunk offset to add to reported site index
     :return: Tuple of (components, (params for each entry in mod), {dict of optimized sites -> components})
     """
-    components = transform.fit_svd(depths_prepped, num_components=num_components)
+    components = transform.fit_svd(depths_prepped, var_cutoff=var_cutoff)
 
     transformed = transform.transform_raw_iterative(depths_prepped, components, zscores=False)
     dmat = np.transpose(depth_matrix)
@@ -155,7 +155,7 @@ def gen_chunk_indices(regions, chunksize):
         indices.append(np.arange(start, len(regions), step=numchunks))
     return indices
 
-def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv=1.0, chunk_size=1000):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=1.0, chunk_size=1000):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -180,10 +180,6 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
             logging.error("All samples have CV > {} !".format(max_cv))
             return
 
-        if (len(sample_names)-np.sum(which))<num_components:
-            logging.error("Need at least as many passing samples as components ({} samples passed CV filter, {} components)".format(sum(which), num_components))
-            return
-
         if sum(which)==0:
             logging.info("No samples have CV < {}".format(max_cv))
 
@@ -193,7 +189,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
 
         depth_matrix = util.remove_samples_max_cv(depth_matrix, max_cv=max_cv)
 
-    logging.info("Beginning new training run using {} components and chunk size {}".format(num_components, chunk_size))
+    logging.info("Beginning new training run removing {:.2f}% of variance and chunk size {}".format(100.0*var_cutoff, chunk_size))
 
     if use_depth_mask:
         logging.info("Creating target mask")
@@ -220,7 +216,7 @@ def train(depths_path, model_save_path, use_depth_mask, num_components=6, max_cv
         raw_depths_chunk = masked_depths[indices, :]
         components, params = _fit_sites(raw_depths_chunk,
                                         depths_prepped_chunk,
-                                        num_components,
+                                        var_cutoff,
                                         mods=mods)
 
         chunk_data.append((indices, components))

@@ -16,17 +16,23 @@ def prep_data(depth_matrix, rowmeans=None):
     depths_prepped = np.transpose(depths_prepped)
     return depths_prepped
 
-def fit_svd(prepped_depths, num_components=6):
+def fit_svd(prepped_depths, var_cutoff, max_components=25):
     """
-    Compute and return the eigenvectors associated with the top 'num_components' singular values
-    :param depth_matrix: Matrix of depths, with rows as samples and columns as targets
+    Compute and return the eigenvectors associated with the top k singular values such that
+    the proportion of variance explained by the k singular values is at least var_cutoff
+    :param prepped_depths: Matrix of depths, with rows as samples and columns as targets, after 'prep'
+    :param var_cutoff: Proportion of variance to remove
+    :param max_components: Dont try to remove more than this number of components
     :return: Matrix of components, with num_components columns and [target count] rows
     """
     colmeans = np.median(prepped_depths, axis=0)
     centered = prepped_depths - colmeans
     # centered = prepped_depths
-    U, S, V = randomized_svd(centered, n_components=num_components, n_oversamples=10)
-    return np.matrix(V).T
+    U, S, V = randomized_svd(centered, n_components=max_components, n_oversamples=10)
+    prop_v = np.cumsum(S * S / (np.sum(S * S)))  # Cumulative proportion of variance explained
+    eigs = np.nonzero(prop_v > var_cutoff)[0][0]  # Number of components (columns of V) to retain
+    logging.debug("Retaining top {} vectors from SVD".format(eigs))
+    return np.matrix(V[0:eigs,:]).T
 
 
 # @util.timeit
