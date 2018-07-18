@@ -502,12 +502,15 @@ def predict(model_path,
 
 
     output_fh = sys.stdout
+    output_bedfh = open("cobalt_cnvs.bed", "w")
     if output_path is not None:
         logging.info("Done computing probabilities, emitting output to {}".format(output_path))
         output_fh = open(output_path, "w")
+        output_bedfh=open(((str(output_path)).rstrip('.vcf') + ".bed"), "w")
 
     if outputvcf:
         emit_vcf(cnv_calls, samplename=samplename, ref_path=ref_path, min_quality=min_quality, output_fh=output_fh)
+        emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_bedfh)
     else:
         emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_fh)
 
