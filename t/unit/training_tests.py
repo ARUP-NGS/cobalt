@@ -10,14 +10,12 @@ def test_model_train_save_load(tmpdir, bknd_depths_100):
     training.train(bknd_depths_100,
                    modelpath,
                    use_depth_mask=True,
-                   num_components=6,
+                   var_cutoff=0.95,
                    max_cv=1.0,
-                   chunk_size=100)
+                   chunk_size=37)
 
     mod = model.load_model(modelpath)
     assert isinstance(mod, model.CobaltModel)
-
-
 
 
 def test_model_load_predict(simple_model, sample_depths_100):

@@ -4,6 +4,7 @@
 import argparse
 import logging
 import sys
+import cobaltcnv
 from cobaltcnv import training, prediction
 
 logging.basicConfig(level=logging.INFO,
@@ -11,7 +12,7 @@ logging.basicConfig(level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser("Cobalt CNV caller")
+    parser = argparse.ArgumentParser("Cobalt CNV caller version {}".format(cobaltcnv.__version__))
 
     subparsers = parser.add_subparsers(help='sub-command help', dest='subparser_name', title='sub-commands')
 
@@ -19,8 +20,7 @@ if __name__=="__main__":
 
     train.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
     train.add_argument("--save-model", "-o", help="Path to which trained model should be saved", required=True)
-    train.add_argument("--num-components", help="Number of components to subtract during training", type=int,
-                        default=6)
+    train.add_argument("--var-cutoff", help="Proportion of variance to remove via SVD", type=float, default=0.90)
     train.add_argument("--no-mask", help="Turn off site masking", action='store_true', default=False)
     train.add_argument("--chunk-size", help="Number of sites to include in a chunk", type=int, default=1000)
     train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
@@ -30,6 +30,7 @@ if __name__=="__main__":
     predict.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
     predict.add_argument("--min-qual", "-q", help="Minimum quality to emit CNV call", type=float, default=0.80)
     predict.add_argument("-o", "--output", help="Output path for prediction results", default=None)
+    predict.add_argument("-bo", "--bed_output", help="Output bedfile path for prediction results (to be only provided with --vcf option)", required=False, default=None)
     predict.add_argument("-a", "--alpha", help="Transition parameter for HMM", default=0.05, type=float)
     predict.add_argument("-b", "--beta", help="Other transition parameter for HMM", default=0.05, type=float)
     predict.add_argument("--sex", help="Force assume sample sex, (=M, =F)", choices=['M', 'F'])
@@ -62,7 +63,12 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     if args.subparser_name == "train":
-        training.train(args.depths, args.save_model, use_depth_mask=not args.no_mask, num_components=args.num_components, max_cv=args.max_cv, chunk_size=args.chunk_size)
+        training.train(args.depths, 
+                       args.save_model, 
+                       use_depth_mask=not args.no_mask, 
+                       var_cutoff=args.var_cutoff,
+                       max_cv=args.max_cv,
+                       chunk_size=args.chunk_size)
 
     elif args.subparser_name == "predict":
         assume_female = None
@@ -70,6 +76,7 @@ if __name__=="__main__":
             assume_female = args.sex == 'F'
         prediction.predict(args.model, args.depths,
                            output_path=args.output,
+                           output_bed=args.bed_output,
                            min_quality=args.min_qual,
                            alpha=args.alpha,
                            beta=args.beta,
