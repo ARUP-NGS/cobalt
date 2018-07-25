@@ -454,6 +454,7 @@ def predict(model_path,
             alpha=0.05,
             beta=0.05,
             output_path=None,
+            output_bed=None,
             min_quality=0.90,
             assume_female=None,
             genome=util.ReferenceGenomes.B37,
@@ -508,6 +509,9 @@ def predict(model_path,
 
     if outputvcf:
         emit_vcf(cnv_calls, samplename=samplename, ref_path=ref_path, min_quality=min_quality, output_fh=output_fh)
+        if output_bed is not None:
+            output_bedfh = open(output_bed, "w")
+            emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_bedfh)
     else:
         emit_bed(cnv_calls, min_quality=min_quality, output_fh=output_fh)
 
