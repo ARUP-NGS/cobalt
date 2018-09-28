@@ -48,7 +48,7 @@ def test_simple_seg():
         MockDist(3)
     ])
 
-    segments = segment_cnvs(regions, stateprobs, modelhmm)
+    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2)
 
     assert len(segments)==3
     assert segments[0].targets == 2
