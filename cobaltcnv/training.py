@@ -4,8 +4,11 @@ import numpy as np
 from cobaltcnv import util, model, transform
 import logging
 
+# The minimum size of a 'chunk' (list of regions over which the SVD is computed)
+MIN_CHUNK_SIZE = 50
 
-def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods):
+
+def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
     """
     Transform the given data by fitting a PCA to the prepped depths, subtracting the given number of components, iteratively
     predicting the deviations produced by increasing or decreasing the raw depth values at each site, then returning the
@@ -27,7 +30,7 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods):
     num_sites = depths_prepped.shape[1]
 
     for site in range(num_sites):
-        fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False)
+        fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False, min_depth=min_depth)
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
@@ -148,6 +151,14 @@ def gen_chunk_indices(regions, chunksize):
     :param chunksize:
     :return: A list containing arrays of array indices
     """
+    if chunksize < MIN_CHUNK_SIZE:
+        raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
+
+    if chunksize < len(regions):
+        logging.warning("Reducing chunk size to {} because there are only {} regions")
+        chunksize = len(regions)
+
+
     numchunks = len(regions) / chunksize
     numchunks = int(max(1, numchunks))
     indices = []
@@ -155,7 +166,7 @@ def gen_chunk_indices(regions, chunksize):
         indices.append(np.arange(start, len(regions), step=numchunks))
     return indices
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=1.0, chunk_size=1000):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -193,7 +204,7 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=
 
     if use_depth_mask:
         logging.info("Creating target mask")
-        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=25.0)
+        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=min_depth)
     else:
         logging.info("Skipping mask creation")
         mask = np.ones(shape=(depth_matrix.shape[0], )) == 1 # Convert 1 to True
@@ -217,7 +228,8 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=
         components, params = _fit_sites(raw_depths_chunk,
                                         depths_prepped_chunk,
                                         var_cutoff,
-                                        mods=mods)
+                                        mods=mods,
+                                        min_depth=min_depth)
 
         chunk_data.append((indices, components))
         for i,par in enumerate(params):
