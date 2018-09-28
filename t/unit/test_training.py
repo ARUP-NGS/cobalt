@@ -7,7 +7,7 @@ import pytest
 def test_model_train_save_load(tmpdir, bknd_depths_100):
     """ Can we train and save, and reload a tiny model """
     modelpath = os.path.join(tmpdir, "testmodel.model")
-
+    training.MIN_CHUNK_SIZE = 1  # Otherwise we'll fail a check for sane input...
     training.train(bknd_depths_100,
                    modelpath,
                    use_depth_mask=True,
@@ -48,6 +48,7 @@ def test_chunk_gen(numregions, chunksize):
     """
     Test to make sure gen_chunk_indices always includes every index exactly once
     """
+    training.MIN_CHUNK_SIZE = 1 # Otherwise we'll fail a check for sane input...
     regions = list(range(numregions))
     indices = training.gen_chunk_indices(regions, chunksize)
 
