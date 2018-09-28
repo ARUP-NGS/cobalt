@@ -82,7 +82,7 @@ def read_data_bed(bedfile, rescale_func=None):
             rescaled_data[sample] = scaled_vals
         data = rescaled_data
 
-    return data.as_matrix(), sample_names
+    return data.values, sample_names
 
 def sample_means(depths):
     """
