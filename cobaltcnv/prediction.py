@@ -301,13 +301,16 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     :return: List of CNVCall objects
     """
 
-    diploid_state = 2
+
     autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
     x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
     y_regions, y_depths, y_params = _filter_regions_by_chroms(cmodel.regions, transformed_depths, cmodel.params, util.Y_CHROM)
 
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
+
+    # diploid state is the INDEX of the column in state probs that corresponds to diploid, typically 2
+    diploid_state = next((i, em) for i, em in enumerate(autosomal_model.em) if em.copy_number() == 2)[0]
     autosomal_state_probs = autosomal_model.forward_backward(autosomal_depths)[1:]
     autosomal_std = standardize_depths(autosomal_depths, autosomal_params[diploid_state])
     autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model, ref_ploidy=2)
@@ -325,6 +328,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
         logging.info("Determining X chromosome copy number states and qualities")
         x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use)
+        # x_diploid_state = next((i, em) for i, em in enumerate(x_model.em) if em.copy_number() == 2)[0]
         x_state_probs = x_model.forward_backward(x_depths)[1:]
         x_std = standardize_depths(x_depths, x_params[diploid_state])
         x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model, ref_ploidy=ref_ploidy)
@@ -338,6 +342,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     if len(y_regions)>0 and use_male_chrcounts:
         logging.info("Determining Y chromosome copy number states and qualities")
         y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
+        # y_diploid_state = next((i, em) for i, em in enumerate(y_model.em) if em.copy_number() == 2)[0]
         y_state_probs = y_model.forward_backward(y_depths)[1:]
         y_std = standardize_depths(y_depths, y_params[diploid_state])
         y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model, ref_ploidy=1)

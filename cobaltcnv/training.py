@@ -37,15 +37,6 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
     return components, all_params
 
 
-def make_chunks_simple(chunk_size, site_max):
-    """
-    Generate ranges of size chunk_size, truncating the last to site_max
-    WARNING: This could yield a very small chunk, for instance 1 site, if site_max = n*chunk_size+1
-    :param chunk_size: Size of chunks to make (except last)
-    :return: List of (start index, end index) tuples describing chunk boundaries
-    """
-    return [ (s, min(s+chunk_size, site_max)) for s in range(0, site_max, chunk_size)]
-
 def split_bychr(regions):
     """
     Return a list of (start, end) tuples that contain the first and last+1 indexes of each separate chromosome
