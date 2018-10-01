@@ -49,7 +49,8 @@ may still be impossible, for instance if every background sample has zero depth.
     --var-cutoff
 Fraction of variance in depth matrix to remove for each chunk. The number of singular vectors subtracted from depth matrix will be computed using this value. Default = 0.90, which often results in 5-6 singular vestors being removed.
 
-
+    --min-depth
+Minimum absolute mean depth for each target; targets with less mean depth less than this value will be ignored. Default = 20. 
 
 We recommend at least 50 samples for training. Most importantly, the samples use for training MUST represent the
 type of conditions used to create the test samples. For instance, training samples should have insert sizes,
