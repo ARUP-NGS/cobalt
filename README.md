@@ -46,8 +46,9 @@ Cobalt by default will ignore very low depth or highly variable targets during t
 this option disables the masking feature and cobalt will try to fit every target. Note that for some targets fitting
 may still be impossible, for instance if every background sample has zero depth.
 
-    --num-components [6]
-Number of eigenvectors used to identify major axes of variation in data.
+    --var-cutoff
+Fraction of variance in depth matrix to remove for each chunk. The number of singular vectors subtracted from depth matrix will be computed using this value. Default = 0.90, which often results in 5-6 singular vestors being removed.
+
 
 
 We recommend at least 50 samples for training. Most importantly, the samples use for training MUST represent the
