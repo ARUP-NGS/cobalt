@@ -61,9 +61,9 @@ def transform_raw(mat, components=None, comp_mat=None, zscores=True):
     pre-computed comp.dot( comp.T) matrix,
 
     :param sample_depths: Array of depths for a sinlge sample
-    :param components: Optional,Components matrix from PCA
+    :param components: Optional, components matrix from PCA
     :param comp_mat: Optional, pre-computed components.dot( components.T ),
-    :return: Depth matrix with
+    :return: Depth matrix with mat.components.components removed
     """
     if components is None and comp_mat is None:
         raise ValueError("must provide either components or pre-multiplied components matrix")
