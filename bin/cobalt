@@ -4,6 +4,7 @@
 import argparse
 import logging
 import sys
+import cobaltcnv
 from cobaltcnv import training, prediction
 
 logging.basicConfig(level=logging.INFO,
@@ -11,7 +12,7 @@ logging.basicConfig(level=logging.INFO,
                     datefmt='%Y-%m-%d %H:%M:%S')
 
 if __name__=="__main__":
-    parser = argparse.ArgumentParser("Cobalt CNV caller")
+    parser = argparse.ArgumentParser("Cobalt CNV caller version {}".format(cobaltcnv.__version__))
 
     subparsers = parser.add_subparsers(help='sub-command help', dest='subparser_name', title='sub-commands')
 
@@ -23,6 +24,7 @@ if __name__=="__main__":
     train.add_argument("--no-mask", help="Turn off site masking", action='store_true', default=False)
     train.add_argument("--chunk-size", help="Number of sites to include in a chunk", type=int, default=1000)
     train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
+    train.add_argument("--min-depth", help="Minimum mean depth of target for inclusion in training", type=float, default=20.0)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
     predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
@@ -67,7 +69,8 @@ if __name__=="__main__":
                        use_depth_mask=not args.no_mask, 
                        var_cutoff=args.var_cutoff,
                        max_cv=args.max_cv,
-                       chunk_size=args.chunk_size)
+                       chunk_size=args.chunk_size,
+                       min_depth=args.min_depth)
 
     elif args.subparser_name == "predict":
         assume_female = None

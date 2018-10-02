@@ -4,8 +4,11 @@ import numpy as np
 from cobaltcnv import util, model, transform
 import logging
 
+# The minimum size of a 'chunk' (list of regions over which the SVD is computed)
+MIN_CHUNK_SIZE = 50
 
-def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods):
+
+def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
     """
     Transform the given data by fitting a PCA to the prepped depths, subtracting the given number of components, iteratively
     predicting the deviations produced by increasing or decreasing the raw depth values at each site, then returning the
@@ -27,21 +30,12 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods):
     num_sites = depths_prepped.shape[1]
 
     for site in range(num_sites):
-        fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False)
+        fits = transform.fit_site2(dmat, depths_prepped, components, site, transformed, mods=mods, rmoutliers=False, min_depth=min_depth)
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
     return components, all_params
 
-
-def make_chunks_simple(chunk_size, site_max):
-    """
-    Generate ranges of size chunk_size, truncating the last to site_max
-    WARNING: This could yield a very small chunk, for instance 1 site, if site_max = n*chunk_size+1
-    :param chunk_size: Size of chunks to make (except last)
-    :return: List of (start index, end index) tuples describing chunk boundaries
-    """
-    return [ (s, min(s+chunk_size, site_max)) for s in range(0, site_max, chunk_size)]
 
 def split_bychr(regions):
     """
@@ -62,84 +56,6 @@ def split_bychr(regions):
     bdys.append((start_index, i+1))
     return bdys
 
-def region_dist(r0, r1):
-    """
-    Distance in bp between midpoints of two regions
-    """
-    if r0[0] != r1[0]:
-        return float("inf")
-    else:
-        m0 = float(r0[1] + r0[2]) / 2.0
-        m1 = float(r1[1] + r1[2]) / 2.0
-        return abs(m0-m1)
-
-def find_split(regions, start, end):
-    """
-    Find best split point for regions between the given indices
-    :return: Index of best split point
-    """
-    best_index = start
-    biggest_gap = float("-inf")
-    for i in range(start, end-1):
-        gap_size = region_dist(regions[i], regions[i+1])
-        if gap_size > biggest_gap:
-            best_index = i
-            biggest_gap = gap_size
-    return best_index
-
-def split_chunk(regions, start, end, min_chunk_size):
-    """
-    For the current chunk defined by [start..end), attempt to divide it into two smaller regions, both of which
-    must be greater than min_chunk_size
-    :param regions:
-    :param start: Current region start index
-    :param end: Current region end index
-    :param min_chunk_size: Minimum size of chunk
-    :return:
-    """
-    if end-start < min_chunk_size:
-        raise ValueError('Region is already smaller than min_chunk_size')
-    if end-start < 2*min_chunk_size:
-        raise ValueError('No divisions possible, region already smaller than 2*min_chunk_size')
-
-    inner_start = start + min_chunk_size
-    inner_end = end - min_chunk_size
-
-    split_point = find_split(regions, inner_start, inner_end)
-    return [(start, split_point+1), (split_point+1, end)]
-
-
-def split_all_regions(regions, min_chunk_size, max_chunk_size):
-    """
-    Create a partitioning of the regions such that no partition contains more than max_chunk_size targets or less
-    than min_chunk_size targets, and the boundaries between partitions are chosen so as to prefer splitting on
-    larger distances, so that nearby regions (for instance, regions in genes) typically end up in the same partition
-    :param regions: List of tuples defining all regions. Must be sorted by contig and start position.
-    :param min_chunk_size: No partitions should include more than this number of regions
-    :param max_chunk_size: No partitions should contain fewer than this number of regions
-    :return: List of [start, end) tuples defining indexes of regions in each partition.
-    """
-    #First, split everything by chrom
-    if max_chunk_size < 2*min_chunk_size:
-        raise ValueError('Sorry, maximum chunk size must be greater than 2*minimum_chunk_size')
-    chrom_splits = split_bychr(regions)
-    final_chunks = []
-
-    for start, end in chrom_splits:
-        chr_chunks = [(start, end)]
-        # Iterate over chunks in chr_chunks, if any are bigger than max_chunk_size, split them and add them to
-        # a new list, then iterate over that.
-        while any( ((e-s > max_chunk_size) for s,e in chr_chunks)):
-            new_chunks = []
-            for chunk in chr_chunks:
-                if chunk[1] - chunk[0] > max_chunk_size:
-                    subchunk0, subchunk1 = split_chunk(regions, chunk[0], chunk[1], min_chunk_size)
-                    new_chunks.extend([subchunk0, subchunk1])
-                else:
-                    new_chunks.append(chunk)
-            chr_chunks = new_chunks
-        final_chunks.extend(chr_chunks)
-    return final_chunks
 
 def gen_chunk_indices(regions, chunksize):
     """
@@ -148,6 +64,14 @@ def gen_chunk_indices(regions, chunksize):
     :param chunksize:
     :return: A list containing arrays of array indices
     """
+    if chunksize < MIN_CHUNK_SIZE:
+        raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
+
+    if chunksize < len(regions):
+        logging.warning("Reducing chunk size to {} because there are only {} regions")
+        chunksize = len(regions)
+
+
     numchunks = len(regions) / chunksize
     numchunks = int(max(1, numchunks))
     indices = []
@@ -155,7 +79,7 @@ def gen_chunk_indices(regions, chunksize):
         indices.append(np.arange(start, len(regions), step=numchunks))
     return indices
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=1.0, chunk_size=1000):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -193,7 +117,7 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=
 
     if use_depth_mask:
         logging.info("Creating target mask")
-        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=25.0)
+        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=min_depth)
     else:
         logging.info("Skipping mask creation")
         mask = np.ones(shape=(depth_matrix.shape[0], )) == 1 # Convert 1 to True
@@ -217,7 +141,8 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff=0.90, max_cv=
         components, params = _fit_sites(raw_depths_chunk,
                                         depths_prepped_chunk,
                                         var_cutoff,
-                                        mods=mods)
+                                        mods=mods,
+                                        min_depth=min_depth)
 
         chunk_data.append((indices, components))
         for i,par in enumerate(params):

@@ -137,7 +137,7 @@ def fit_single(dmat, components, site, intermediate, id_outliers=True, sample_ma
 
     return a, shape, loc, which
 
-def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, mods, rmoutliers=False):
+def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, mods, rmoutliers=False, min_depth=20):
     """
     Estimate distribution parameters for 'normal' (diploid, unadjusted), deletion (normal * 0.5) and
     duplication (normal * 1.5) values independently and return them all as a list of tuples
@@ -149,7 +149,7 @@ def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, mods, rmou
     """
     orig_z = dmat_prepped[:, site].copy()
     orig_row = dmat_raw[:, site].copy()
-    if orig_row.mean() < 20:
+    if orig_row.mean() < min_depth:
         logging.warning("Insufficient coverage at site {}, returning default params".format(site))
         return [(0, 0.0, 1.0) for _ in range(len(mods))]
 

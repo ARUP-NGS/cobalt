@@ -19,8 +19,8 @@ class InvalidResultError(Exception):
 class HMM(object):
     """
     A simple HMM, defined by a a transition matrix, list of emission distributions, and initial distribution
-    This provides functions for computing the forward likelihood and the likelihood of a particular series
-     of observations when the true state is known
+    This provides functions for computing the forward likelihood, forward/backward and viterbi algorithm
+    see partially vectorized implementations below
     """
 
     def __init__(self, transitions, emissions, init_dist):
