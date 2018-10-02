@@ -96,7 +96,7 @@ def gen_chunk_indices(regions, chunksize):
         indices.append(np.arange(start, len(regions), step=numchunks))
     return indices
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -134,7 +134,7 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
 
     if use_depth_mask:
         logging.info("Creating target mask")
-        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=min_depth)
+        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=low_depth_trim_frac, high_depth_trim_frac=high_depth_trim_frac, min_depth=min_depth)
     else:
         logging.info("Skipping mask creation")
         mask = np.ones(shape=(depth_matrix.shape[0], )) == 1 # Convert 1 to True

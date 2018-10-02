@@ -43,6 +43,8 @@ if __name__=="__main__":
     train.add_argument("--chunk-size", help="Number of sites to include in a chunk", type=int, default=1000)
     train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
     train.add_argument("--min-depth", help="Minimum mean depth of target for inclusion in training", type=float, default=20.0)
+    train.add_argument("--low-depth-trim-frac", help="Fraction of targets to remove due to low depth", type=float, default=0.01)
+    train.add_argument("--high-depth-trim-frac", help="Fraction of targets to remove due to high depth", type=float, default=0.01)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
     predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
