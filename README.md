@@ -4,6 +4,12 @@
 Cobalt is a tool to detect germline copy-number variants (CNVs) from targeted (hybridization-capture) NGS data.
 
 
+## License
+
+Cobalt is licensed under the [GNU General Public License (GPL) v3](https://www.gnu.org/licenses/gpl.txt). As they say: Cobalt is 
+distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
 ## Usage
 
 Cobalt has two main modes: training and prediction. In the training mode a 'model' is
