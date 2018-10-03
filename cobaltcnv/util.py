@@ -149,7 +149,7 @@ def remove_samples_max_cv(depths, max_cv = 0.8):
     return m
 
 
-def create_region_mask(depths, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=3.0):
+def create_region_mask(depths, cvar_trim_frac, low_depth_trim_frac, high_depth_trim_frac, min_depth):
     """
     Create a list of booleans, one for each region in depths.shape[0], signifying if the region is to be
     masked from further analysis.
@@ -160,10 +160,8 @@ def create_region_mask(depths, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, hi
     """
     means = np.mean(depths, axis=1) # Target means
     coeff_var = np.std(depths, axis=1) / means
+    coeff_var = np.nan_to_num(coeff_var, 0.0) # Some sites will have 0 mean depth, which leads to NaNs in the coeff_var array
 
-    mean_cv = np.mean(coeff_var)
-    std_cv = np.std(coeff_var)
-    logging.info("Mean CV: {}  std CV : {}".format(mean_cv, std_cv))
     cvar_sorted = np.sort(coeff_var)
     cvar_cutoff = cvar_sorted[ int(cvar_sorted.shape[0]*(1.0-cvar_trim_frac))]
 
@@ -174,13 +172,13 @@ def create_region_mask(depths, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, hi
     min_depth_mask = means < min_depth
     logging.info("Min depth ({}) mask flagged {} of {} ({:.2%}) regions as failing".format(min_depth, min_depth_mask.sum(), depths.shape[0],
                                                                                            min_depth_mask.sum() / float(depths.shape[0])))
-    low_mean_mask = means < low_depth_cutoff
+    low_mean_mask = means <= low_depth_cutoff
     logging.info("Low mean ({:.2f}) mask flagged {} of {} ({:.2%}) regions as failing".format(low_depth_cutoff, low_mean_mask.sum(), depths.shape[0],
                                                                                            low_mean_mask.sum() / float(depths.shape[0])))
     high_mean_mask = means > high_depth_cutoff
     logging.info("High mean ({:.2f}) mask flagged {} of {} ({:.2%}) regions as failing".format(high_depth_cutoff, high_mean_mask.sum(), depths.shape[0],
                                                                                                high_mean_mask.sum() / float(depths.shape[0])))
-    high_var_mask = coeff_var > cvar_cutoff
+    high_var_mask = coeff_var >= cvar_cutoff
     logging.info("High CV ({:.2f}) mask flagged {} of {} ({:.2%}) regions as failing".format(cvar_cutoff, high_var_mask.sum(), depths.shape[0],
                                                                                              high_var_mask.sum() / float(depths.shape[0])))
     mask = np.logical_or(low_mean_mask, high_mean_mask)

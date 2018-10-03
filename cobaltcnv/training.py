@@ -96,7 +96,7 @@ def gen_chunk_indices(regions, chunksize):
         indices.append(np.arange(start, len(regions), step=numchunks))
     return indices
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -107,6 +107,9 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     :param num_components: Number of components / rank of reduced matrix to remove from depths
     :param max_cv: Maximum coefficient of variation of depths for samples,
     :param chunk_size: Approximate number of sites to include in each partition of the targets
+    :param min_depth: Minimum depth of target for inclusion in model
+    :param low_depth_trim_frac: Fraction of targets to remove due to low coverage
+    :param high_depth_trim_frac: Fraction of targets to remove because of high coverage
     """
 
     logging.info("Starting new training run using depths from {}".format(depths_path))
@@ -134,7 +137,11 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
 
     if use_depth_mask:
         logging.info("Creating target mask")
-        mask = util.create_region_mask(depth_matrix, cvar_trim_frac=0.01, low_depth_trim_frac=0.01, high_depth_trim_frac=0.01, min_depth=min_depth)
+        mask = util.create_region_mask(depth_matrix,
+                                       cvar_trim_frac=high_cv_trim_frac,
+                                       low_depth_trim_frac=low_depth_trim_frac,
+                                       high_depth_trim_frac=high_depth_trim_frac,
+                                       min_depth=min_depth)
     else:
         logging.info("Skipping mask creation")
         mask = np.ones(shape=(depth_matrix.shape[0], )) == 1 # Convert 1 to True

@@ -43,6 +43,10 @@ if __name__=="__main__":
     train.add_argument("--chunk-size", help="Number of sites to include in a chunk", type=int, default=1000)
     train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
     train.add_argument("--min-depth", help="Minimum mean depth of target for inclusion in training", type=float, default=20.0)
+    train.add_argument("--low-depth-trim-frac", help="Fraction of targets to remove due to low depth", type=float, default=0.01)
+    train.add_argument("--high-depth-trim-frac", help="Fraction of targets to remove due to high depth", type=float, default=0.01)
+    train.add_argument("--high-cv-trim-frac", help="Fraction of targets to remove due to high target coeff. variation", type=float,
+                       default=0.01)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
     predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
@@ -88,7 +92,10 @@ if __name__=="__main__":
                        var_cutoff=args.var_cutoff,
                        max_cv=args.max_cv,
                        chunk_size=args.chunk_size,
-                       min_depth=args.min_depth)
+                       min_depth=args.min_depth,
+                       low_depth_trim_frac=args.low_depth_trim_frac,
+                       high_depth_trim_frac=args.high_depth_trim_frac,
+                       high_cv_trim_frac=args.high_cv_trim_frac)
 
     elif args.subparser_name == "predict":
         assume_female = None
