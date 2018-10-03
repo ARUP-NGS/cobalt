@@ -1,14 +1,7 @@
 
 # Cobalt
 
-Cobalt is a tool to detect germline copy-number variants (CNVs) from targeted (hybridization-capture) NGS data.
-
-
-## License
-
-Cobalt is licensed under the [GNU General Public License (GPL) v3](https://www.gnu.org/licenses/gpl.txt). As they say: Cobalt is 
-distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+Cobalt is a tool to detect germline copy-number variants (CNVs) from targeted (hybridization-capture) NGS data. It can build a 'model' from a set of control samples, then use the model to call CNVs from a test sample. The samples aren't strictly BAM / CRAM files, they're actually read depths measured at a specific set of genomic locations we call the "CNV targets". Usually the targets are just a (unpadded) BED file of the locations of the capture probes. Cobalt contains a utility called 'covcounter' to count reads over a list of targets for a set of BAM or CRAM files.    
 
 ## Usage
 
@@ -47,16 +40,24 @@ will become slower if this is much greater than 10,000 or so. Values less than 1
 Cobalt by default will remove background samples where the coefficient of variation of depths over targets is greater than a certain
 value (by default 1.0). If you don't want any samples removed, set this number to be very high.
 
-    --no-mask
-Cobalt by default will ignore very low depth or highly variable targets during training, this is called target 'masking',
-this option disables the masking feature and cobalt will try to fit every target. Note that for some targets fitting
+    --no-mask [False]
+Cobalt by default will ignore very low depth, very high depth, or highly variable targets during training, this is called target 'masking' This flag disables the masking feature and cobalt will try to fit every target. Note that for some targets fitting
 may still be impossible, for instance if every background sample has zero depth.
 
-    --var-cutoff
+    --var-cutoff [0.90]
 Fraction of variance in depth matrix to remove for each chunk. The number of singular vectors subtracted from depth matrix will be computed using this value. Default = 0.90, which often results in 5-6 singular vestors being removed.
 
-    --min-depth
-Minimum absolute mean depth for each target; targets with less mean depth less than this value will be ignored. Default = 20. 
+    --min-depth [20]
+Minimum absolute mean depth for each target; targets with less mean depth less than this value will be masked. Default = 20. 
+
+    --low-depth-trim-frac [0.01]
+Fraction of targets to mask due to low depth. If this is set to X, then the Xth fraction of targets with the lowest absolute depth (prior to normalization) will be masked.
+
+    --high-depth-trim-frac [0.01]
+Fraction of targets to mask due to high depth. If this is set to X, then the Xth fraction of targets with the highest absolute depth (prior to normalization) will be masked.
+
+    --high-cv-trim-frac [0.01]
+Fraction of targets to mask due to high coefficient of variation (CV). Targetwise CV is computed for each target, then the Xth highest are masked.
 
 We recommend at least 50 samples for training. Most importantly, the samples use for training MUST represent the
 type of conditions used to create the test samples. For instance, training samples should have insert sizes,
@@ -163,3 +164,11 @@ samples. Such a file can be created in several ways, including use of [GATK's De
      covcounter --bed my_bed_file.bed --bams some_bam.bam other_bam.bam third.bam --threads 24 > control_sample_coverages.bed
 
  By default ```covcounter``` will use 2 threads, but should scale reasonably well with more.
+ 
+ 
+## License
+
+Cobalt is licensed under the [GNU General Public License (GPL) v3](https://www.gnu.org/licenses/gpl.txt). As they say: Cobalt is 
+distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+ or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
