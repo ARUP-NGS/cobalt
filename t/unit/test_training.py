@@ -14,7 +14,10 @@ def test_model_train_save_load(tmpdir, bknd_depths_100):
                    var_cutoff=0.95,
                    max_cv=1.0,
                    chunk_size=37,
-                   min_depth=20)
+                   min_depth=20,
+                   low_depth_trim_frac=0.01,
+                   high_depth_trim_frac=0.01,
+                   high_cv_trim_frac=0.01)
 
     mod = model.load_model(modelpath)
     assert isinstance(mod, model.CobaltModel)
@@ -58,3 +61,19 @@ def test_chunk_gen(numregions, chunksize):
         allindices.extend(i)
     assert len(allindices) == numregions
     assert set(allindices) == set(regions)
+
+@pytest.mark.parametrize('numregions, chunksize, expectednum', [
+    (100, 20, 5),
+    # (100, 10),
+])
+def test_chunk_gen_correct_chunk_num(numregions, chunksize, expectednum):
+    """
+    Test to make sure gen_chunk_indices generates the expected number of chunks
+    """
+    training.MIN_CHUNK_SIZE = 1 # Otherwise we'll fail a check for sane input...
+    regions = list(range(numregions))
+    indices = training.gen_chunk_indices(regions, chunksize)
+
+    # Now combine all indices back into a big set
+    allchunks = list(indices)
+    assert len(allchunks) == expectednum
