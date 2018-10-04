@@ -84,9 +84,10 @@ def gen_chunk_indices(regions, chunksize):
     if chunksize < MIN_CHUNK_SIZE:
         raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
 
-    if chunksize < len(regions):
-        logging.warning("Reducing chunk size to {} because there are only {} regions")
+    if chunksize > len(regions):
         chunksize = len(regions)
+        logging.warning("Reducing chunk size to {} because there are only {} regions".format(chunksize, len(regions)))
+
 
 
     numchunks = len(regions) / chunksize
