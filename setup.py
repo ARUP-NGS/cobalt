@@ -27,6 +27,8 @@ def version_tag():
         raise ValueError("Could not find __version__ in cobaltcnv/__init__.py")
     version = version[0].strip().replace('__version__=', '').replace('"', '')
     return version
+
+
 if __name__ == '__main__':
     setup(
         name = 'cobaltcnv',
