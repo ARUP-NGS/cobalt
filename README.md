@@ -3,6 +3,25 @@
 
 Cobalt is a tool to detect germline copy-number variants (CNVs) from targeted (hybridization-capture) NGS data. It can build a 'model' from a set of control samples, then use the model to call CNVs from a test sample. The samples aren't strictly BAM / CRAM files, they're actually read depths measured at a specific set of genomic locations we call the "CNV targets". Usually the targets are just a (unpadded) BED file of the locations of the capture probes. Cobalt contains a utility called 'covcounter' to count reads over a list of targets for a set of BAM or CRAM files.    
 
+
+## Installation and requirements
+
+Cobalt is written in python and requires python 3.5 or later. If you have python installed, the easiest thing to do is type:
+
+    pip install git+https://github.com/ARUP-NGS/cobalt.git@0.6.3
+
+The `@0.6.3` part refers to the version of cobalt you wish to install, check out the [releases page](https://github.com/ARUP-NGS/cobalt/releases) to find the latest one.
+
+You can also install from source by cloning in the git repo using the following command:
+
+    git clone https://github.com/ARUP-NGS/cobalt.git
+
+then navigating into the newly created cobalt directory (`cd cobalt`), and installing via pip like this:
+
+    pip install .
+
+Cobalt depends on a several other python packages (numpy, pandas, sklearn, etc.) that are installed automatically by pip. 
+
 ## Usage
 
 Cobalt has two main modes: training and prediction. In the training mode a 'model' is
