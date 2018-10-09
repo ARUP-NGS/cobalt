@@ -45,7 +45,7 @@ Cobalt by default will ignore very low depth, very high depth, or highly variabl
 may still be impossible, for instance if every background sample has zero depth.
 
     --var-cutoff [0.90]
-Fraction of variance in depth matrix to remove for each chunk. The number of singular vectors subtracted from depth matrix will be computed using this value. Default = 0.90, which often results in 5-6 singular vestors being removed.
+Fraction of variance in depth matrix to remove for each chunk. The number of singular vectors subtracted from depth matrix will be computed using this value. Default = 0.90, which often results in 5-6 singular vectors being used.
 
     --min-depth [20]
 Minimum absolute mean depth for each target; targets with less mean depth less than this value will be masked. Default = 20. 
