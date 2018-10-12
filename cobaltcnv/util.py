@@ -160,7 +160,7 @@ def create_region_mask(depths, cvar_trim_frac, low_depth_trim_frac, high_depth_t
     """
     means = np.mean(depths, axis=1) # Target means
     coeff_var = np.std(depths, axis=1) / means
-    coeff_var = np.nan_to_num(coeff_var, 0.0) # Some sites will have 0 mean depth, which leads to NaNs in the coeff_var array
+    coeff_var = np.nan_to_num(coeff_var) # Some sites will have 0 mean depth, which leads to NaNs in the coeff_var array
 
     cvar_sorted = np.sort(coeff_var)
     cvar_cutoff = cvar_sorted[ int(cvar_sorted.shape[0]*(1.0-cvar_trim_frac))]
