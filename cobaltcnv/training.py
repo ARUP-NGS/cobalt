@@ -20,6 +20,7 @@ along with Cobalt.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 from cobaltcnv import util, model, transform
 import logging
+import sys
 
 # The minimum size of a 'chunk' (list of regions over which the SVD is computed)
 MIN_CHUNK_SIZE = 50
@@ -113,6 +114,8 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     :param high_depth_trim_frac: Fraction of targets to remove because of high coverage
     """
 
+    args = locals().copy() # Store the argument list so we can save it in the model, just so we can look at it later
+    del args['model_save_path']
     logging.info("Starting new training run using depths from {}".format(depths_path))
     depth_matrix, sample_names = util.read_data_bed(depths_path)
     regions = util.read_regions(depths_path)
@@ -177,6 +180,14 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
 
-    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask, samplenames=sample_names)
+
+    cobaltmodel = model.CobaltModel(chunk_data,
+                                    all_params,
+                                    mods,
+                                    regions,
+                                    mask=mask,
+                                    samplenames=sample_names,
+                                    cobaltargs=["{}={}".format(k,v) for k,v in args.items()])
+
     model.save_model(cobaltmodel, model_save_path)
 
