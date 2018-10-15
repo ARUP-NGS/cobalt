@@ -177,6 +177,6 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
 
-    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask, samplecount=len(sample_names))
+    cobaltmodel = model.CobaltModel(chunk_data, all_params, mods, regions, mask=mask, samplenames=sample_names)
     model.save_model(cobaltmodel, model_save_path)
 

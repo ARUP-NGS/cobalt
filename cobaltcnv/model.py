@@ -9,7 +9,7 @@ COBALT_MODEL_VERSION="1.0"
 
 class CobaltModel(object):
 
-    def __init__(self, chunk_data, params, mods, regions, mask=None, samplecount=None):
+    def __init__(self, chunk_data, params, mods, regions, mask=None, samplenames=None):
         self.ver = COBALT_MODEL_VERSION
         self.birthday = datetime.now()
         self.chunk_data = chunk_data
@@ -17,7 +17,7 @@ class CobaltModel(object):
         self.regions = regions
         self.mask = mask
         self.mods = mods
-        self.samplecount = samplecount
+        self.samplenames = samplenames
 
     def describe(self, outputfh=None):
         """
@@ -36,7 +36,9 @@ class CobaltModel(object):
         if self.samplecount is None:
             outputfh.write("Training samples: Unknown")
         else:
-            outputfh.write("Training samples: {}\n".format(self.samplecount))
+            outputfh.write("Training samples: {}\n".format(len(self.samplenames)))
+            for name in self.samplenames:
+                print("\t{}".format(name))
 
 def save_model(model, dest_path):
     """ Pickle a CNVModel and dump it to a file """
