@@ -33,7 +33,7 @@ class CobaltModel(object):
         else:
             outputfh.write("Masked targets:   {}\n".format(int(np.sum(1.0 - self.mask))))
 
-        if self.samplecount is None:
+        if self.samplenames is None:
             outputfh.write("Training samples: Unknown")
         else:
             outputfh.write("Training samples: {}\n".format(len(self.samplenames)))
