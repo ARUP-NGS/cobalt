@@ -225,6 +225,10 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
 
 def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
+    if len(regions) != len(depths):
+        raise ValueError("Number of regions must be equal to number of depths")
+    if len(regions) != len(params[0]):
+        raise ValueError("Number of regions must be equal to number of parameters")
     flt_depths = [depth for region, depth in zip(regions, depths) if region[0] in chroms_to_include]
     flt_regions = [region for region in regions if region[0] in chroms_to_include]
     flt_params = []
