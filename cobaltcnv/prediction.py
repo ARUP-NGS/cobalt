@@ -321,7 +321,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
     autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
     x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
-    y_regions, y_depths, y_params = _filter_regions_by_chroms(cmodel.regions, transformed_depths, cmodel.params, util.Y_CHROM)
+    y_regions, y_depths, y_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.Y_CHROM)
 
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
