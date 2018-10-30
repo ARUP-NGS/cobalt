@@ -52,7 +52,7 @@ def cnv_to_vcf(cnv, ref, passqual):
     cn_log2 = np.log2(cnv.cn_exp / 2.0)
     cn_log2_lower = np.log2(cnv.cn_lower_conf / 2.0)
     cn_log2_upper = np.log2(cnv.cn_upper_conf / 2.0)
-    info = "TARGETS={};END={};SVTYPE=CNV;CN={};LOG2={:.4f};LOG2LOWER={:.4f};LOG2UPPER={:.4f}".format(cnv.targets, cnv.end, cnv.copynum, cn_log2, cn_log2_lower, cn_log2_upper)
+    info = "TARGETS={};SVEND={};SVTYPE=CNV;CN={};LOG2={:.4f};LOG2LOWER={:.4f};LOG2UPPER={:.4f}".format(cnv.targets, cnv.end, cnv.copynum, cn_log2, cn_log2_lower, cn_log2_upper)
     return "\t".join([
         cnv.chrom,
         str(cnv.start+1),

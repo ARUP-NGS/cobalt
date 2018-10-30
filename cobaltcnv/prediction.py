@@ -225,6 +225,10 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
 
 def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
+    if len(regions) != len(depths):
+        raise ValueError("Number of regions must be equal to number of depths")
+    if len(regions) != len(params[0]):
+        raise ValueError("Number of regions must be equal to number of parameters")
     flt_depths = [depth for region, depth in zip(regions, depths) if region[0] in chroms_to_include]
     flt_regions = [region for region in regions if region[0] in chroms_to_include]
     flt_params = []
@@ -321,7 +325,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
 
     autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
     x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
-    y_regions, y_depths, y_params = _filter_regions_by_chroms(cmodel.regions, transformed_depths, cmodel.params, util.Y_CHROM)
+    y_regions, y_depths, y_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.Y_CHROM)
 
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
