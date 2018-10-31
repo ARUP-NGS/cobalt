@@ -5,7 +5,7 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##CobaltVersion="{ver}"
 ##CobaltCMD="{cmd}"
 ##INFO=<ID=TARGETS,Number=1,Type=String,Description="Number of targets spanned by variant">
-##INFO=<ID=END,Number=1,Type=Integer,Description="End position of variant">
+##INFO=<ID=SVEND,Number=1,Type=Integer,Description="End position of variant">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number estimate">
 ##INFO=<ID=LOG2,Number=1,Type=Float,Description="Log2 adjusted deviation in read depth">
