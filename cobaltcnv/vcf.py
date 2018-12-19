@@ -8,6 +8,8 @@ VCF_HEADER = """##fileformat=VCFv4.2
 ##INFO=<ID=SVEND,Number=1,Type=Integer,Description="End position of variant">
 ##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
 ##INFO=<ID=CN,Number=1,Type=Integer,Description="Copy number estimate">
+##INFO=<ID=CIPOS,Number=2,Type=Integer,Description="Confidence boundary for CNV start position">
+##INFO=<ID=CIEND,Number=2,Type=Integer,Description="Confidence boundary for CNV end position">
 ##INFO=<ID=LOG2,Number=1,Type=Float,Description="Log2 adjusted deviation in read depth">
 ##INFO=<ID=LOG2UPPER,Number=1,Type=Float,Description="Upper confidence bound for log2">
 ##INFO=<ID=LOG2LOWER,Number=1,Type=Float,Description="Lower confidence bound for log2">
@@ -52,7 +54,17 @@ def cnv_to_vcf(cnv, ref, passqual):
     cn_log2 = np.log2(cnv.cn_exp / 2.0)
     cn_log2_lower = np.log2(cnv.cn_lower_conf / 2.0)
     cn_log2_upper = np.log2(cnv.cn_upper_conf / 2.0)
-    info = "TARGETS={};SVEND={};SVTYPE=CNV;CN={};LOG2={:.4f};LOG2LOWER={:.4f};LOG2UPPER={:.4f}".format(cnv.targets, cnv.end, cnv.copynum, cn_log2, cn_log2_lower, cn_log2_upper)
+    info = ";".join(
+        "TARGETS={}".format(cnv.targets),
+        "SVEND={}".format(cnv.end),
+        "SVTYPE=CNV",
+        "CIPOS={},{}".format(cnv.outer_start, cnv.start),
+        "CIEND={},{}".format(cnv.end, cnv.outer_end),
+        "CN={}".format(cnv.copynum),
+        "LOG2={:.4f}".format(cn_log2),
+        "LOG2LOWER={:.4f}".format(cn_log2_lower),
+        "LOG2UPPER={:.4f}".format(cn_log2_upper))
+
     return "\t".join([
         cnv.chrom,
         str(cnv.start+1),
