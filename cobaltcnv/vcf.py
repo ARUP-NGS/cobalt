@@ -54,16 +54,16 @@ def cnv_to_vcf(cnv, ref, passqual):
     cn_log2 = np.log2(cnv.cn_exp / 2.0)
     cn_log2_lower = np.log2(cnv.cn_lower_conf / 2.0)
     cn_log2_upper = np.log2(cnv.cn_upper_conf / 2.0)
-    info = ";".join(
+    info = ";".join([
         "TARGETS={}".format(cnv.targets),
         "SVEND={}".format(cnv.end),
         "SVTYPE=CNV",
-        "CIPOS={},{}".format(cnv.outer_start, cnv.start),
-        "CIEND={},{}".format(cnv.end, cnv.outer_end),
+        "CIPOS={},{}".format(cnv.outer_start + 1, cnv.start + 1),
+        "CIEND={},{}".format(cnv.end + 1, cnv.outer_end + 1),
         "CN={}".format(cnv.copynum),
         "LOG2={:.4f}".format(cn_log2),
         "LOG2LOWER={:.4f}".format(cn_log2_lower),
-        "LOG2UPPER={:.4f}".format(cn_log2_upper))
+        "LOG2UPPER={:.4f}".format(cn_log2_upper)])
 
     return "\t".join([
         cnv.chrom,

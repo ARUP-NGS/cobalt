@@ -101,6 +101,10 @@ if __name__=="__main__":
         assume_female = None
         if args.sex is not None:
             assume_female = args.sex == 'F'
+
+        if args.vcf and not args.reference:
+            raise ValueError('Path to reference genome required for VCF output (use -r / --reference)')
+
         prediction.predict(args.model, args.depths,
                            output_path=args.output,
                            output_bed=args.bed_output,
