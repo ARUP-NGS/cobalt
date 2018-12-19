@@ -51,9 +51,9 @@ def cnv_to_vcf(cnv, ref, passqual):
     elif cnv.ref_ploidy == 1:
         gt = "1"
 
-    cn_log2 = np.log2(cnv.cn_exp / 2.0)
-    cn_log2_lower = np.log2(cnv.cn_lower_conf / 2.0)
-    cn_log2_upper = np.log2(cnv.cn_upper_conf / 2.0)
+    cn_log2 = np.log2(cnv.cn_exp / cnv.ref_ploidy)
+    cn_log2_lower = np.log2(cnv.cn_lower_conf / cnv.ref_ploidy)
+    cn_log2_upper = np.log2(cnv.cn_upper_conf / cnv.ref_ploidy)
     info = ";".join([
         "TARGETS={}".format(cnv.targets),
         "SVEND={}".format(cnv.end),
