@@ -308,7 +308,7 @@ def copynumber_variance(probs):
     return variance
 
 
-def emit_target_info(region, probs, fh, std=None):
+def emit_target_info(region, probs, fh, std=None, ref_ploidy=2):
     """
     Compute the copy-number expectation, stdev and log2 of the expectation for the given probability list
      and write them to the given file handle
@@ -326,7 +326,7 @@ def emit_target_info(region, probs, fh, std=None):
         cn_std = "NA"
 
     try:
-        log2 = "{:.4f}".format(np.log2(cn_exp/2.0))
+        log2 = "{:.4f}".format(np.log2(cn_exp/ref_ploidy))
     except:
         log2 = "NA"
 
@@ -427,10 +427,11 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
             emit_target_info(region, probs, emit_each_target_fh, std)
 
         for region, probs, std in zip(x_regions, x_state_probs, x_std):
-            emit_target_info(region, probs, emit_each_target_fh, std)
+            ref_ploidy = 1 if use_male_chrcounts else 2
+            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=ref_ploidy)
 
         for region, probs, std in zip(y_regions, y_state_probs, y_std):
-            emit_target_info(region, probs, emit_each_target_fh, std)
+            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=1)
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
