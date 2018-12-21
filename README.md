@@ -8,9 +8,9 @@ Cobalt is a tool to detect germline copy-number variants (CNVs) from targeted (h
 
 Cobalt is written in python and requires python 3.5 or later. If you have python installed, the easiest thing to do is type:
 
-    pip install git+https://github.com/ARUP-NGS/cobalt.git@0.6.3
+    pip install git+https://github.com/ARUP-NGS/cobalt.git@0.6.5
 
-The `@0.6.3` part refers to the version of cobalt you wish to install, check out the [releases page](https://github.com/ARUP-NGS/cobalt/releases) to find the latest one.
+The `@0.6.5` part refers to the version of cobalt you wish to install, check out the [releases page](https://github.com/ARUP-NGS/cobalt/releases) to find the latest one.
 
 You can also install from source by cloning in the git repo using the following command:
 
