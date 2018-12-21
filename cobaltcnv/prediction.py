@@ -33,8 +33,10 @@ class CNVCall(object):
 
     def __init__(self, chrom, start, end, copynumber, ref_ploidy, quality, targets):
         self.chrom = chrom
-        self.start = start
-        self.end = end
+        self.start = start      # Minimal ('inner') genomic start of call
+        self.end = end          # Minimal ('inner') genomic end coordinate of call
+        self.outer_start = None # Outer / maximal genomic start coordinate of call
+        self.outer_end = None   # Outer / maximal genomic end coordinate of call
         self.copynum = copynumber
         self.ref_ploidy = ref_ploidy
         self.quality = quality
@@ -50,6 +52,71 @@ class CNVCall(object):
 
     def phred_quality(self):
         return -10.0 * np.log10(self.quality)
+
+
+class ProtoCNV(object):
+    """
+    Created during segmentation procedure to store partial information about a CNV call.
+    """
+
+    def __init__(self, all_regions, copynumber, ref_ploidy):
+        self.all_regions = all_regions
+        self.copy_number = copynumber
+        self.ref_ploidy = ref_ploidy
+        self.region_indices = []
+        self.quals = []
+        self.means = []
+        self.variances = []
+
+    def add_region(self, index, qual, mean, variance):
+        self.region_indices.append(index)
+        self.quals.append(qual)
+        self.means.append(mean)
+        self.variances.append(variance)
+
+    @property
+    def chrom(self):
+        """
+        Return the chromosome on which the CNV lies (computed on the fly from the list of included regions
+        """
+        chroms = set( self.all_regions[i][0] for i in self.region_indices)
+        if len(chroms) > 1:
+            raise ValueError("Found multiple chromosomes in a single CNV call! : {}".format(chroms))
+
+        return list(chroms)[0]
+
+    def build_call(self):
+        """
+        Create and return a single CNVCall object, with attributes set appropriately using the data stored in
+        region_indices, quals, means, etc.
+        :param all_regions: List of region tuples [(chrom, start, end), ...]
+        :return: CNVCall object
+        """
+
+        chr = self.chrom
+        inner_start = min(self.all_regions[i][1] for i in self.region_indices)
+        inner_end = max(self.all_regions[i][2] for i in self.region_indices)
+
+        try:
+            outer_start = max(r[2] for r in self.all_regions if r[2] < inner_start and r[0] == chr)
+        except:
+            outer_start = inner_start
+
+        try:
+            outer_end = min(r[1] for r in self.all_regions if r[1] > inner_end and r[0] == chr)
+        except:
+            outer_end = inner_end
+
+        call = CNVCall(self.chrom, inner_start, inner_end, self.copy_number, self.ref_ploidy, 0, len(self.region_indices))
+        call.outer_start = outer_start
+        call.outer_end = outer_end
+        call.quality = np.mean(self.quals)
+        call.cn_exp = np.mean(self.means)
+        call.cn_std = np.std(self.means)
+        call.cn_std_mean = np.mean(np.sqrt(self.variances))
+        call.cn_lower_conf = np.mean([max(0.0, m - 2.0 * np.sqrt(v)) for m, v in zip(self.means, self.variances)])
+        call.cn_upper_conf = np.mean([m + 2.0 * np.sqrt(v) for m, v in zip(self.means, self.variances)])
+        return call
 
 
 
@@ -141,6 +208,8 @@ def emit_site_info(model_path, emit_bed=False):
             mask_index += 1
 
 
+
+
 def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
     """
     A very simple segmentation algorithm that just groups calls based on whether or not they
@@ -154,11 +223,8 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
     cnvs = []
     diploid_state = next( (i,em) for i,em in enumerate(modelhmm.em) if em.copy_number()==2)[0]
-    cnv_state = diploid_state
+    prev_state = diploid_state
     current_cnv = None
-    quals = [] # Running list of single-target qualities to use for building the final quality
-    means = [] # Ditto for copy-number expectations
-    variances = [] # Ditto for copy-number variances
 
     for j, (region, probs) in enumerate(zip(regions, stateprobs)):
 
@@ -166,15 +232,11 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
         end_existing_cnv = False
         make_new_cnv = False
 
-        if state==cnv_state:
+        if state==prev_state:
             if state == diploid_state:
                 continue
             elif region[0] == current_cnv.chrom:
-                current_cnv.targets += 1
-                current_cnv.end = region[2]
-                quals.append(probs[state])
-                means.append(copynumber_expectation(probs))
-                variances.append(copynumber_variance(probs))
+                current_cnv.add_region(j, probs[state], copynumber_expectation(probs), copynumber_variance(probs))
             else:
                 end_existing_cnv = True
                 make_new_cnv = True
@@ -190,36 +252,20 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
             end_existing_cnv = True
             make_new_cnv = True
 
-        cnv_state = state
+        prev_state = state
         if end_existing_cnv and current_cnv is not None:
-            current_cnv.quality = np.mean(quals)
-            current_cnv.cn_exp = np.mean(means)
-            current_cnv.cn_std = np.std(means)
-            current_cnv.cn_std_mean = np.mean(np.sqrt(variances))
-            current_cnv.cn_lower_conf = np.mean([max(0.0, m - 2.0 * np.sqrt(v)) for m, v in zip(means, variances)])
-            current_cnv.cn_upper_conf = np.mean([m + 2.0 * np.sqrt(v) for m, v in zip(means, variances)])
-            cnvs.append(current_cnv)
-            quals = []
-            means = []
-            variances = []
+            cnvs.append(current_cnv.build_call())
             current_cnv = None
 
         if make_new_cnv:
             if current_cnv is not None:
                 raise ValueError('Cant make a new CNV while one already exists')
-            current_cnv = CNVCall(region[0], region[1], region[2], modelhmm.em[state].copy_number(), ref_ploidy, 0, 1)
-            quals.append(probs[state])
-            means.append(copynumber_expectation(probs))
-            variances.append(copynumber_variance(probs))
+            current_cnv = ProtoCNV(regions, modelhmm.em[state].copy_number(), ref_ploidy)
+            current_cnv.add_region(j, probs[state], copynumber_expectation(probs), copynumber_variance(probs))
 
+    # Dont forget to add the last CNV if we end traversing regions still in CNV state
     if current_cnv is not None:
-        current_cnv.quality = np.mean(quals)
-        current_cnv.cn_exp = np.mean(means)
-        current_cnv.cn_std = np.std(means)
-        current_cnv.cn_std_mean = np.mean(np.sqrt(variances))
-        current_cnv.cn_lower_conf = np.mean([max(0.0, m-2.0*np.std(v)) for m,v in zip(means, variances)])
-        current_cnv.cn_upper_conf = np.mean([m+2.0*np.std(v) for m,v in zip(means, variances)])
-        cnvs.append(current_cnv)
+        cnvs.append(current_cnv.build_call())
 
     return cnvs
 
@@ -262,7 +308,7 @@ def copynumber_variance(probs):
     return variance
 
 
-def emit_target_info(region, probs, fh, std=None):
+def emit_target_info(region, probs, fh, std=None, ref_ploidy=2):
     """
     Compute the copy-number expectation, stdev and log2 of the expectation for the given probability list
      and write them to the given file handle
@@ -280,7 +326,7 @@ def emit_target_info(region, probs, fh, std=None):
         cn_std = "NA"
 
     try:
-        log2 = "{:.4f}".format(np.log2(cn_exp/2.0))
+        log2 = "{:.4f}".format(np.log2(cn_exp/ref_ploidy))
     except:
         log2 = "NA"
 
@@ -381,10 +427,11 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
             emit_target_info(region, probs, emit_each_target_fh, std)
 
         for region, probs, std in zip(x_regions, x_state_probs, x_std):
-            emit_target_info(region, probs, emit_each_target_fh, std)
+            ref_ploidy = 1 if use_male_chrcounts else 2
+            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=ref_ploidy)
 
         for region, probs, std in zip(y_regions, y_state_probs, y_std):
-            emit_target_info(region, probs, emit_each_target_fh, std)
+            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=1)
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
