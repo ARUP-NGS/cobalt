@@ -29,7 +29,7 @@ def prep_data(depth_matrix, rowmeans=None):
     :return: A new np.matrix containing transposed, transformed values from depth matrix
     """
 
-    depths_prepped = np.log(depth_matrix+1.0) #
+    depths_prepped = np.log(depth_matrix+1.0)
     depths_prepped = np.transpose(depths_prepped)
     return depths_prepped
 
