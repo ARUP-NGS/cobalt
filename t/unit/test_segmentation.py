@@ -163,9 +163,14 @@ def test_copynums_log2s_sexchroms():
     segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=1)
     assert len(segments) == 2
     assert segments[0].targets == 1
-    assert segments[0].copynum == 1
+    assert segments[0].copynum == 2
     assert segments[0].start == 20
     assert segments[0].end == 30
+    
+    assert segments[1].targets == 2
+    assert segments[1].copynum == 0
+    assert segments[1].start == 40
+    assert segments[1].end == 60
 
 
 def test_copynum_exp():
