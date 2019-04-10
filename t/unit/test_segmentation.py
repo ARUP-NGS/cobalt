@@ -1,7 +1,7 @@
 
 import pytest
 from io import StringIO
-from cobaltcnv.prediction import segment_cnvs, copynumber_expectation, emit_target_info
+from cobaltcnv.prediction import segment_cnvs, copynumber_expectation, emit_target_info, ProtoCNV
 
 class MockHMM(object):
 
@@ -166,7 +166,7 @@ def test_copynums_log2s_sexchroms():
     assert segments[0].copynum == 2
     assert segments[0].start == 20
     assert segments[0].end == 30
-    
+
     assert segments[1].targets == 2
     assert segments[1].copynum == 0
     assert segments[1].start == 40
@@ -301,3 +301,57 @@ def test_emit_target_info_ploidy2():
         elif i == 4:
             assert float(toks[3]) == pytest.approx(4.0)
             assert float(toks[5]) == pytest.approx(1.0)  # Should be log2(4.0 / 2.0) = +1
+
+
+
+def test_trim_lowqual_edges_left():
+    allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
+
+    protocnv = ProtoCNV(allregions, copynumber=1, ref_ploidy=2)
+    protocnv.add_region(2, 0.7, 1.0, 0.1)
+    protocnv.add_region(3, 1.0, 1.0, 0.1)
+    protocnv.add_region(4, 1.0, 1.0, 0.1)
+
+    cnv = protocnv.build_call(trim_lowqual_edges=True)
+    assert cnv.targets == 2
+    assert cnv.quality == 1.0
+    assert cnv.start == 40
+    assert cnv.end == 55
+
+
+def test_trim_lowqual_edges_right():
+    allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
+
+    protocnv = ProtoCNV(allregions, copynumber=1, ref_ploidy=2)
+    protocnv.add_region(2, 0.9, 1.0, 0.1)
+    protocnv.add_region(3, 1.0, 1.0, 0.1)
+    protocnv.add_region(4, 0.93, 1.0, 0.1)
+    protocnv.add_region(5, 0.85, 1.0, 0.1)
+    protocnv.add_region(6, 0.6, 1.0, 0.1)
+
+    cnv = protocnv.build_call(trim_lowqual_edges=True)
+    assert cnv.targets == 4
+    assert cnv.quality == 0.95
+    assert cnv.start == 30
+    assert cnv.end == 45
+
+
+def test_trim_lowqual_edges_thatcase():
+    """
+    A real-world test case
+    :return:
+    """
+    allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
+
+    protocnv = ProtoCNV(allregions, copynumber=1, ref_ploidy=2)
+    protocnv.add_region(2, 0.9999, 1.0, 0.1)
+    protocnv.add_region(3, 0.82, 1.0, 0.1)
+    protocnv.add_region(4, 0.53, 1.0, 0.1)
+
+    cnv = protocnv.build_call(trim_lowqual_edges=True)
+    assert cnv.targets == 2
+    assert cnv.quality == 0.95
+    assert cnv.start == 30
+    assert cnv.end == 45
+
+

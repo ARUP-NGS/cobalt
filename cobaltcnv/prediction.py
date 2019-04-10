@@ -75,6 +75,14 @@ class ProtoCNV(object):
         self.variances.append(variance)
 
     @property
+    def inner_start(self):
+        return min(self.all_regions[i][1] for i in self.region_indices)
+
+    @property
+    def inner_end(self):
+        return max(self.all_regions[i][2] for i in self.region_indices)
+
+    @property
     def chrom(self):
         """
         Return the chromosome on which the CNV lies (computed on the fly from the list of included regions
@@ -85,7 +93,42 @@ class ProtoCNV(object):
 
         return list(chroms)[0]
 
-    def build_call(self):
+    def trim_lowqual_edge_regions(self):
+        """
+        Experimental feature to remove regions on the either edge of the CNV that are much lower quality than the
+        remaining regions. This is to avoid the situation where one very high confidence region borders a much lower
+        confidence region, leading to a combined quality is low enough to cause the entire call to be ignored. In such
+        cases its better to retain the few good targets.
+        """
+        if len(self.region_indices) < 2:
+            return
+
+        max_to_trim = min(len(self.region_indices) // 2 + 1, 2)  # Dont remove more than this number of targets from either edge
+
+        qmean = np.mean(self.quals)
+        left_trim = 0
+        for i in range(1, max_to_trim):
+            newqual = np.mean(self.quals[0:i])
+            if qmean / newqual > 1.25:
+                left_trim = i
+                qmean = newqual
+
+        qmean = np.mean(self.quals)
+        right_trim = len(self.region_indices)
+        for j in range(1, max_to_trim):
+            newqual = np.mean(self.quals[len(self.region_indices) - j:])
+            if qmean / newqual  > 1.25:
+                right_trim = len(self.region_indices) - j
+                qmean = newqual
+
+        logging.debug("Trimming {} left and {} right regions from CNV {}:{}-{} (previously had {} targets)".format(left_trim, right_trim, self.chrom, self.inner_start, self.inner_end, len(self.region_indices)))
+        self.region_indices = self.region_indices[left_trim:right_trim]
+        self.quals = self.quals[left_trim:right_trim]
+        self.means = self.means[left_trim:right_trim]
+        self.variances = self.variances[left_trim:right_trim]
+
+
+    def build_call(self, trim_lowqual_edges=False):
         """
         Create and return a single CNVCall object, with attributes set appropriately using the data stored in
         region_indices, quals, means, etc.
@@ -93,21 +136,24 @@ class ProtoCNV(object):
         :return: CNVCall object
         """
 
+        if trim_lowqual_edges:
+            self.trim_lowqual_edge_regions()
+
         chrom = self.chrom
-        inner_start = min(self.all_regions[i][1] for i in self.region_indices)
-        inner_end = max(self.all_regions[i][2] for i in self.region_indices)
+        in_start = self.inner_start
+        in_end = self.inner_end
 
         try:
-            outer_start = max(r[2] for r in self.all_regions if r[2] < inner_start and r[0] == chrom)
+            outer_start = max(r[2] for r in self.all_regions if r[2] < in_start and r[0] == chrom)
         except:
-            outer_start = inner_start
+            outer_start = in_start
 
         try:
-            outer_end = min(r[1] for r in self.all_regions if r[1] > inner_end and r[0] == chrom)
+            outer_end = min(r[1] for r in self.all_regions if r[1] > in_end and r[0] == chrom)
         except:
-            outer_end = inner_end
+            outer_end = in_end
 
-        call = CNVCall(self.chrom, inner_start, inner_end, self.copy_number, self.ref_ploidy, 0, len(self.region_indices))
+        call = CNVCall(self.chrom, in_start, in_end, self.copy_number, self.ref_ploidy, 0, len(self.region_indices))
         call.outer_start = outer_start
         call.outer_end = outer_end
         call.quality = np.mean(self.quals)
@@ -257,7 +303,7 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
         prev_state = state
         if end_existing_cnv and current_cnv is not None:
-            cnvs.append(current_cnv.build_call())
+            cnvs.append(current_cnv.build_call(trim_lowqual_edges=True))
             current_cnv = None
 
         if make_new_cnv:
@@ -271,7 +317,7 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
     # Dont forget to add the last CNV if we end traversing regions still in CNV state
     if current_cnv is not None:
-        cnvs.append(current_cnv.build_call())
+        cnvs.append(current_cnv.build_call(trim_lowqual_edges=True))
 
     return cnvs
 
