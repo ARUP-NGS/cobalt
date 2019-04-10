@@ -62,6 +62,7 @@ if __name__=="__main__":
     predict.add_argument("-r", "--reference", help="Path to reference genome fasta")
     predict.add_argument("-t", "--target-info", help="Write target-specific information to this path")
     predict.add_argument("-n", "--name", required=False, type=str, help="Sample name in emitted VCF")
+    predict.add_argument("--trim-edges", required=False, default=False, help="Trim loq quality edge targets from CNV calls", action='store_true')
 
 
     # plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
@@ -115,7 +116,8 @@ if __name__=="__main__":
                            outputvcf=args.vcf,
                            ref_path=args.reference,
                            emit_target_path=args.target_info,
-                           samplename=args.name)
+                           samplename=args.name,
+                           trim_lowqual_edges=args.trim_edges)
 
     elif args.subparser_name == "plot":
         raise NotImplemented()
