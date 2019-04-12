@@ -49,7 +49,7 @@ def test_simple_seg():
         MockDist(3)
     ])
 
-    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2)
+    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2, trim_low_quality_edges=False)
 
     assert len(segments)==3
     assert segments[0].targets == 2
@@ -93,7 +93,7 @@ def test_seg_all():
         MockDist(3)
     ])
 
-    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2)
+    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2, trim_low_quality_edges=False)
 
     assert len(segments)==1
     assert segments[0].targets == 4
@@ -123,7 +123,7 @@ def test_seg_switch():
         MockDist(3)
     ])
 
-    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2)
+    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=2, trim_low_quality_edges=False)
 
     assert len(segments)==2
     assert segments[0].targets == 1
@@ -160,7 +160,7 @@ def test_copynums_log2s_sexchroms():
         MockDist(2),
     ])
 
-    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=1)
+    segments = segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy=1, trim_low_quality_edges=False)
     assert len(segments) == 2
     assert segments[0].targets == 1
     assert segments[0].copynum == 2
@@ -318,6 +318,22 @@ def test_trim_lowqual_edges_left():
     assert cnv.start == 40
     assert cnv.end == 55
 
+def test_trim_lowqual_edges_left_multiple():
+    allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
+
+    protocnv = ProtoCNV(allregions, copynumber=1, ref_ploidy=2)
+    protocnv.add_region(2, 0.7, 1.0, 0.1)
+    protocnv.add_region(3, 0.6, 1.0, 0.1)
+    protocnv.add_region(4, 1.0, 1.0, 0.1)
+    protocnv.add_region(5, 0.9, 1.0, 0.1)
+    protocnv.add_region(6, 0.99, 1.0, 0.1)
+
+    cnv = protocnv.build_call(trim_lowqual_edges=True)
+    assert cnv.targets == 3
+    assert cnv.quality == pytest.approx(0.9633333)
+    assert cnv.start == 50
+    assert cnv.end == 75
+
 
 def test_trim_lowqual_edges_right():
     allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
@@ -326,14 +342,33 @@ def test_trim_lowqual_edges_right():
     protocnv.add_region(2, 0.9, 1.0, 0.1)
     protocnv.add_region(3, 1.0, 1.0, 0.1)
     protocnv.add_region(4, 0.93, 1.0, 0.1)
-    protocnv.add_region(5, 0.85, 1.0, 0.1)
+    protocnv.add_region(5, 0.95, 1.0, 0.1)
     protocnv.add_region(6, 0.6, 1.0, 0.1)
 
     cnv = protocnv.build_call(trim_lowqual_edges=True)
     assert cnv.targets == 4
-    assert cnv.quality == 0.95
+    assert cnv.quality == pytest.approx(0.945)
     assert cnv.start == 30
-    assert cnv.end == 45
+    assert cnv.end == 65
+
+
+def test_trim_lowqual_edges_right_multiple():
+    allregions = [ ("X", i, i+5) for i in range(10, 100, 10)]
+
+    protocnv = ProtoCNV(allregions, copynumber=1, ref_ploidy=2)
+    protocnv.add_region(2, 0.9, 1.0, 0.1)
+    protocnv.add_region(3, 1.0, 1.0, 0.1)
+    protocnv.add_region(4, 0.93, 1.0, 0.1)
+    protocnv.add_region(5, 0.95, 1.0, 0.1)
+    protocnv.add_region(6, 0.6, 1.0, 0.1)
+    protocnv.add_region(7, 0.65, 1.0, 0.1)
+    protocnv.add_region(8, 0.5, 1.0, 0.1)
+
+    cnv = protocnv.build_call(trim_lowqual_edges=True)
+    assert cnv.targets == 4
+    assert cnv.quality == pytest.approx(0.945)
+    assert cnv.start == 30
+    assert cnv.end == 65
 
 
 def test_trim_lowqual_edges_thatcase():
@@ -350,7 +385,7 @@ def test_trim_lowqual_edges_thatcase():
 
     cnv = protocnv.build_call(trim_lowqual_edges=True)
     assert cnv.targets == 2
-    assert cnv.quality == 0.95
+    assert cnv.quality == pytest.approx(0.90995)
     assert cnv.start == 30
     assert cnv.end == 45
 

@@ -103,15 +103,16 @@ class ProtoCNV(object):
         if len(self.region_indices) < 2:
             return
 
-        max_to_trim = min(len(self.region_indices) // 2 + 1, 2)  # Dont remove more than this number of targets from either edge
+        max_to_trim = min(len(self.region_indices) // 2 + 1, 5)  # Dont remove more than this number of targets from either edge
 
         qmean = np.mean(self.quals)
         left_trim = 0
         for i in range(1, max_to_trim):
             newqual = np.mean(self.quals[0:i])
+            r = qmean / newqual
             if qmean / newqual > 1.25:
                 left_trim = i
-                qmean = newqual
+                qmean = np.mean(self.quals[left_trim:])
 
         qmean = np.mean(self.quals)
         right_trim = len(self.region_indices)
@@ -119,7 +120,10 @@ class ProtoCNV(object):
             newqual = np.mean(self.quals[len(self.region_indices) - j:])
             if qmean / newqual  > 1.25:
                 right_trim = len(self.region_indices) - j
-                qmean = newqual
+                qmean = np.mean(self.quals[0:right_trim])
+
+        if left_trim > 0 or right_trim < len(self.region_indices):
+            logging.info("Trimming CNV with quals {} (prev qual {:.4f}) to [{}:{}] (new qual {:.4f})".format(",".join("{:.3f}".format(x) for x in self.quals), np.mean(self.quals), left_trim, right_trim, np.mean(self.quals[left_trim:right_trim])))
 
         logging.debug("Trimming {} left and {} right regions from CNV {}:{}-{} (previously had {} targets)".format(left_trim, right_trim, self.chrom, self.inner_start, self.inner_end, len(self.region_indices)))
         self.region_indices = self.region_indices[left_trim:right_trim]
@@ -274,6 +278,9 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edg
     current_cnv = None
 
     for j, (region, probs) in enumerate(zip(regions, stateprobs)):
+
+        if region[1] == 196743945:
+            print("hi!")
 
         state = np.argmax(probs)
         end_existing_cnv = False
