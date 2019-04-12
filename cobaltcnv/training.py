@@ -75,13 +75,37 @@ def split_bychr(regions):
     return bdys
 
 
+# def gen_chunk_indices(regions, chunksize):
+#     """
+#     A new way to create chunks that just returns lists of array indices for chunks
+#     :param regions:
+#     :param chunksize:
+#     :return: A list containing arrays of array indices
+#     """
+#     if chunksize < MIN_CHUNK_SIZE:
+#         raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
+#
+#     if chunksize > len(regions):
+#         chunksize = len(regions)
+#         logging.warning("Reducing chunk size to {} because there are only {} regions".format(chunksize, len(regions)))
+#
+#
+#
+#     numchunks = len(regions) / chunksize
+#     numchunks = int(max(1, numchunks))
+#     indices = []
+#     for start in range(numchunks):
+#         indices.append(np.arange(start, len(regions), step=numchunks))
+#     return indices
+
 def gen_chunk_indices(regions, chunksize):
     """
-    A new way to create chunks that just returns lists of array indices for chunks
-    :param regions:
-    :param chunksize:
-    :return: A list containing arrays of array indices
+    Different method of generating chunks that makes
+    :param regions: List of region tuples
+    :param chunksize: Approx number of regions in a chunk
+    :return: List of list of array indices, such that members of chunk i belong to indices[i]
     """
+
     if chunksize < MIN_CHUNK_SIZE:
         raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
 
@@ -89,14 +113,23 @@ def gen_chunk_indices(regions, chunksize):
         chunksize = len(regions)
         logging.warning("Reducing chunk size to {} because there are only {} regions".format(chunksize, len(regions)))
 
-
-
     numchunks = len(regions) / chunksize
     numchunks = int(max(1, numchunks))
+    clusterwidth = 50
+    pos = 0
     indices = []
-    for start in range(numchunks):
-        indices.append(np.arange(start, len(regions), step=numchunks))
-    return indices
+    cluster_index = 0
+    while pos < len(regions):
+        cluster_index = cluster_index % numchunks
+        num_to_add = min(clusterwidth, len(regions) - pos)
+        indices.extend([cluster_index] * num_to_add)
+        cluster_index += 1
+        pos += num_to_add
+
+    indices = np.array(indices)
+    index_lists = [np.where(indices == i)[0] for i in range(np.max(indices) + 1)]
+    return index_lists
+
 
 def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac):
     """

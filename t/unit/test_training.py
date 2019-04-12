@@ -62,18 +62,18 @@ def test_chunk_gen(numregions, chunksize):
     assert len(allindices) == numregions
     assert set(allindices) == set(regions)
 
-@pytest.mark.parametrize('numregions, chunksize, expectednum', [
-    (100, 20, 5),
-    # (100, 10),
-])
-def test_chunk_gen_correct_chunk_num(numregions, chunksize, expectednum):
-    """
-    Test to make sure gen_chunk_indices generates the expected number of chunks
-    """
-    training.MIN_CHUNK_SIZE = 1 # Otherwise we'll fail a check for sane input...
-    regions = list(range(numregions))
-    indices = training.gen_chunk_indices(regions, chunksize)
-
-    # Now combine all indices back into a big set
-    allchunks = list(indices)
-    assert len(allchunks) == expectednum
+# @pytest.mark.parametrize('numregions, chunksize, expectednum', [
+#     (100, 20, 5),
+#     # (100, 10),
+# ])
+# def test_chunk_gen_correct_chunk_num(numregions, chunksize, expectednum):
+#     """
+#     Test to make sure gen_chunk_indices generates the expected number of chunks
+#     """
+#     training.MIN_CHUNK_SIZE = 1 # Otherwise we'll fail a check for sane input...
+#     regions = list(range(numregions))
+#     indices = training.gen_chunk_indices(regions, chunksize)
+#
+#     # Now combine all indices back into a big set
+#     allchunks = list(indices)
+#     assert len(allchunks) == expectednum
