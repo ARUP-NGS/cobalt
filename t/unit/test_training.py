@@ -17,11 +17,40 @@ def test_model_train_save_load(tmpdir, bknd_depths_100):
                    min_depth=20,
                    low_depth_trim_frac=0.01,
                    high_depth_trim_frac=0.01,
-                   high_cv_trim_frac=0.01)
+                   high_cv_trim_frac=0.01,
+                   cluster_width=4)
 
     mod = model.load_model(modelpath)
     assert isinstance(mod, model.CobaltModel)
+    assert mod.ver == model.COBALT_MODEL_VERSION
+    assert len(mod.mask) == 99
+    assert len(mod.regions) == 99
+    assert len(mod.params) == 5
 
+def test_model_train_save_load_no_mask(tmpdir, bknd_depths_100):
+    """ Can we train and save, and reload a tiny model """
+    modelpath = os.path.join(tmpdir, "testmodel_nomask.model")
+    training.MIN_CHUNK_SIZE = 1  # Otherwise we'll fail a check for sane input...
+    training.train(bknd_depths_100,
+                   modelpath,
+                   use_depth_mask=False,
+                   var_cutoff=0.95,
+                   max_cv=1.0,
+                   chunk_size=37,
+                   min_depth=20,
+                   low_depth_trim_frac=0.01,
+                   high_depth_trim_frac=0.01,
+                   high_cv_trim_frac=0.01,
+                   cluster_width=4)
+
+    mod = model.load_model(modelpath)
+    assert isinstance(mod, model.CobaltModel)
+    assert mod.ver == model.COBALT_MODEL_VERSION
+    assert len(mod.mask) == 99
+    assert all(m for m in mod.mask)
+    assert len(mod.regions) == 99
+    assert len(mod.params) == 5
+    assert all(len(p) == 99 for p in mod.params)
 
 def test_model_load_predict(simple_model, sample_depths_100):
     """ Load a small model and predict CNVs from it """
@@ -53,7 +82,7 @@ def test_chunk_gen(numregions, chunksize):
     """
     training.MIN_CHUNK_SIZE = 1 # Otherwise we'll fail a check for sane input...
     regions = list(range(numregions))
-    indices = training.gen_chunk_indices(regions, chunksize)
+    indices = training.gen_chunk_indices(regions, chunksize, skip_chunk_size_check=True)
 
     # Now combine all indices back into a big set
     allindices = []
