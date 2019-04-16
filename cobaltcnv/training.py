@@ -23,7 +23,7 @@ import logging
 import sys
 
 # The minimum size of a 'chunk' (list of regions over which the SVD is computed)
-MIN_CHUNK_SIZE = 50
+MIN_CHUNK_SIZE = 100
 
 
 def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
@@ -75,30 +75,73 @@ def split_bychr(regions):
     return bdys
 
 
-def gen_chunk_indices(regions, chunksize):
+# def gen_chunk_indices(regions, chunksize):
+#     """
+#     A new way to create chunks that just returns lists of array indices for chunks
+#     :param regions:
+#     :param chunksize:
+#     :return: A list containing arrays of array indices
+#     """
+#     if chunksize < MIN_CHUNK_SIZE:
+#         raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
+#
+#     if chunksize > len(regions):
+#         chunksize = len(regions)
+#         logging.warning("Reducing chunk size to {} because there are only {} regions".format(chunksize, len(regions)))
+#
+#
+#
+#     numchunks = len(regions) / chunksize
+#     numchunks = int(max(1, numchunks))
+#     indices = []
+#     for start in range(numchunks):
+#         indices.append(np.arange(start, len(regions), step=numchunks))
+#     return indices
+
+def gen_chunk_indices(regions, chunksize, cluster_width=50, skip_chunk_size_check=False):
     """
-    A new way to create chunks that just returns lists of array indices for chunks
-    :param regions:
-    :param chunksize:
-    :return: A list containing arrays of array indices
+    Different method of generating chunks that makes "clusters" of chunks, instead of spreading chunks out
+    evenly and uniformly. The idea is to generate chunks that look like:
+
+    target  : 1 2 3 4 5 6 7 8 9 10 11 12 13 14...
+    chunk   : 1 1 1 2 2 2 3 3 3  1  1  1  2  2...
+    previous: 1 2 3 1 2 3 1 2 3  1  2  3  1  2...
+
+    .. so that chunks share lots of adjacent targets. This might be helpful because sets of adjacent targets
+    may share similar properties, because they may be affected by the same haplotype, for instance.
+    :param regions: List of region tuples
+    :param chunksize: Approx number of regions in a chunk
+    :param cluster_width: Length of run of cluster indices (3 in above example)
+    :param skip_chunk_size_check: If true, do not raise an exception if chunk size is too small (debugging only)
+    :return: List of list of array indices, such that members of chunk i belong to indices[i]
     """
-    if chunksize < MIN_CHUNK_SIZE:
-        raise AttributeError('Minimum chunk size is {}'.format(MIN_CHUNK_SIZE))
+
+    if (not skip_chunk_size_check) and (chunksize < 2 * cluster_width or chunksize < MIN_CHUNK_SIZE):
+        raise AttributeError('Minimum chunk size is {}'.format(max(MIN_CHUNK_SIZE, 2 * cluster_width)))
 
     if chunksize > len(regions):
         chunksize = len(regions)
         logging.warning("Reducing chunk size to {} because there are only {} regions".format(chunksize, len(regions)))
 
-
-
     numchunks = len(regions) / chunksize
     numchunks = int(max(1, numchunks))
-    indices = []
-    for start in range(numchunks):
-        indices.append(np.arange(start, len(regions), step=numchunks))
-    return indices
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac):
+    pos = 0
+    indices = []
+    cluster_index = 0
+    while pos < len(regions):
+        cluster_index = cluster_index % numchunks
+        num_to_add = min(cluster_width, len(regions) - pos)
+        indices.extend([cluster_index] * num_to_add)
+        cluster_index += 1
+        pos += num_to_add
+
+    indices = np.array(indices)
+    index_lists = [np.where(indices == i)[0] for i in range(np.max(indices) + 1)]
+    return index_lists
+
+
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac, cluster_width):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -112,10 +155,15 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     :param min_depth: Minimum depth of target for inclusion in model
     :param low_depth_trim_frac: Fraction of targets to remove due to low coverage
     :param high_depth_trim_frac: Fraction of targets to remove because of high coverage
+    :param cluster_width: Length of adjacent run of chunk indices
     """
 
     args = locals().copy() # Store the argument list so we can save it in the model, just so we can look at it later
     del args['model_save_path']
+
+    if cluster_width > chunk_size / 2:
+        raise AttributeError('Cluster width ({}) must be less than half the chunk size (currently {})'.format(cluster_width, chunk_size))
+
     logging.info("Starting new training run using depths from {}".format(depths_path))
     depth_matrix, sample_names = util.read_data_bed(depths_path)
     regions = util.read_regions(depths_path)
@@ -160,7 +208,7 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     chunk_data = []
     all_params = [[-1 for a in range(masked_depths.shape[0])] for _ in range(len(mods))]
 
-    chunk_indices = gen_chunk_indices(masked_regions, chunk_size)
+    chunk_indices = gen_chunk_indices(masked_regions, chunk_size, cluster_width=cluster_width)
 
     for i, indices in enumerate(chunk_indices):
         logging.info("Processing chunk {} of {}".format(i+1, len(chunk_indices)))
