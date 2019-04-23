@@ -18,7 +18,7 @@ along with Cobalt.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import numpy as np
-from cobaltcnv import util, model, transform
+from cobaltcnv import util, model, transform, qc
 import logging
 import sys
 
@@ -52,7 +52,7 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
-    return components, all_params
+    return components, all_params, transformed
 
 
 def split_bychr(regions):
@@ -210,20 +210,28 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
 
     chunk_indices = gen_chunk_indices(masked_regions, chunk_size, cluster_width=cluster_width)
 
+    all_transformed = [0 for a in range(masked_depths.shape[0])]
+
     for i, indices in enumerate(chunk_indices):
         logging.info("Processing chunk {} of {}".format(i+1, len(chunk_indices)))
         depths_prepped_chunk = depths_prepped[:, indices]
         raw_depths_chunk = masked_depths[indices, :]
-        components, params = _fit_sites(raw_depths_chunk,
+        components, params, transformed_depths = _fit_sites(raw_depths_chunk,
                                         depths_prepped_chunk,
                                         var_cutoff,
                                         mods=mods,
                                         min_depth=min_depth)
 
+        for j, o_index in enumerate(indices):
+            all_transformed[o_index] = np.asarray(transformed_depths[:,j])
+
         chunk_data.append((indices, components))
         for i,par in enumerate(params):
             for j,p in zip(indices, par):
                 all_params[i][j] = p
+
+    logging.info("Parameter fitting complete, generating QC stats")
+    comps, directions = qc.compute_background_pca(all_params, np.squeeze(np.array(all_transformed)).T)
 
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
@@ -235,7 +243,9 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
                                     regions,
                                     mask=mask,
                                     samplenames=sample_names,
-                                    cobaltargs=["{}={}".format(k,v) for k,v in args.items()])
+                                    cobaltargs=["{}={}".format(k,v) for k,v in args.items()],
+                                    background_comps=comps,
+                                    directions=directions)
 
     model.save_model(cobaltmodel, model_save_path)
 

@@ -6,11 +6,11 @@ import sys
 import numpy as np
 from cobaltcnv import __version__
 
-COBALT_MODEL_VERSION="1.1"
+COBALT_MODEL_VERSION="1.2"
 
 class CobaltModel(object):
 
-    def __init__(self, chunk_data, params, mods, regions, mask=None, samplenames=None, cobaltargs=None):
+    def __init__(self, chunk_data, params, mods, regions, mask=None, samplenames=None, cobaltargs=None, background_comps=None, directions=None):
         self.ver = COBALT_MODEL_VERSION
         self.birthday = datetime.now()
         self.chunk_data = chunk_data
@@ -20,6 +20,8 @@ class CobaltModel(object):
         self.mods = mods
         self.samplenames = samplenames
         self.args = cobaltargs
+        self.comps = background_comps
+        self.directions = directions
 
     def describe(self, outputfh=None):
         """
@@ -47,6 +49,10 @@ class CobaltModel(object):
             outputfh.write("Training samples: {}\n".format(len(self.samplenames)))
             for name in self.samplenames:
                 outputfh.write("\t{}\n".format(name))
+
+        if self.comps:
+            outputfh.write("Principle components for QC purposes are stored, dimensions={}".format(self.comps.shape))
+
 
 def save_model(model, dest_path):
     """ Pickle a CNVModel and dump it to a file """
