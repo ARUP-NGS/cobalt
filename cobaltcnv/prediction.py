@@ -19,7 +19,7 @@ along with Cobalt.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import sys
 import os
-from cobaltcnv import util, model, hmm, transform, vcf
+from cobaltcnv import util, model, hmm, transform, vcf, qc
 from cobaltcnv import __version__
 from cobaltcnv.distributions import PosDependentSkewNormal
 import logging
@@ -445,6 +445,23 @@ def has_x_regions(regions):
     return any(r[0] == 'X' or r[0] == 'chrX' for r in regions)
 
 
+def mask_prepare_transform_depths(cmodel, depths):
+    """
+    Apply a region mask in the cmodel if present to the given depths, then 'prep' them and transform
+    :param cmodel: Cobalt model
+    :param depths: Raw sample depths
+    :return: Tuple of Regions with mask targets removed, transformed depths
+    """
+    if hasattr(cmodel, 'mask') and cmodel.mask is not None:
+        logging.info("Applying region mask, removing {} targets".format( len(cmodel.regions)-sum(cmodel.mask)))
+        depths = depths[cmodel.mask, :]
+        regions = [r for r,m in zip(cmodel.regions, cmodel.mask) if m]
+
+    prepped_depths = transform.prep_data(depths)
+    transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
+    return regions, transformed_depths
+
+
 def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_target_fh=None):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
@@ -455,15 +472,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
     :param assume_female: Use female X chrom model (if false, use male, if None, infer)
     :return: List of CNVCall objects representing all calls
     """
-    if hasattr(cmodel, 'mask') and cmodel.mask is not None:
-        logging.info("Applying region mask, removing {} targets".format( len(cmodel.regions)-sum(cmodel.mask)))
-        depths = depths[cmodel.mask, :]
-        regions = [r for r,m in zip(cmodel.regions, cmodel.mask) if m]
-
-    prepped_depths = transform.prep_data(depths)
-    # colmeans = np.median(prepped_depths, axis=1)
-    # centered = prepped_depths - colmeans # HOW IS THIS SOMEHOW NOT REQUIRED??
-    transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
+    regions, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
 
     return construct_hmms_call_states(cmodel,
                                       regions,
@@ -520,6 +529,23 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
     for cnv in cnv_calls:
         if cnv.quality >= min_quality:
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
+
+def run_qc(model_path, depths_path, include_bknds, outputfh=sys.stdout):
+    cmodel = model.load_model(model_path)
+    sample_depths, sample_names = util.read_data_bed(depths_path)
+    logging.info("Computing QC metrics for {} sample{}".format(len(sample_names), 's' if len(sample_names)>1 else ''))
+    outputfh.write("")
+    outputfh.write("sample,pc1,pc2,distance\n")
+    if include_bknds:
+        for i, name in enumerate(cmodel.samplenames):
+            print("{},{:.2f},{:.2f},{:.3f}".format(name, cmodel.comps[i,0], cmodel.comps[i,1], ))
+
+
+    for i, name in enumerate(sample_names):
+        depths = np.matrix(sample_depths[:, i]).reshape((sample_depths.shape[0], 1))
+        _, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
+        mean_dist = qc.compute_mean_dist(cmodel, transformed_depths)
+        outputfh.write("{},{:.3f}\n".format(name, mean_dist))
 
 
 def predict(model_path,

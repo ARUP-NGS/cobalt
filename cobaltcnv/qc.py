@@ -50,6 +50,14 @@ def project_sample(cmodel, sample_transformed_depths):
     projection = standardized_depths.dot(cmodel.directions)
     return projection
 
+# def distance_zscore(cmodel, point):
+#     """
+#     Compute the mean distance of the given point to each other 2-d point from cmodel.comps (the projection
+#     of each background sample along the first and second components), then divide by
+#     :param cmodel:
+#     :param point:
+#     :return:
+#     """
 
 def compute_mean_dist(cmodel, sample_transformed_depths):
     """
@@ -72,5 +80,5 @@ def compute_mean_dist(cmodel, sample_transformed_depths):
     background_pairwise_dists = pdist(cmodel.comps[:,0:2])
     mean_bknd_dist = np.mean(background_pairwise_dists)
     std_bknd_dist = np.std(background_pairwise_dists)
-    return (mean_dist - mean_bknd_dist) / std_bknd_dist
+    return np.abs((mean_dist - mean_bknd_dist) / std_bknd_dist)
 

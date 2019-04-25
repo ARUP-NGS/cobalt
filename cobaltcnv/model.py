@@ -50,8 +50,8 @@ class CobaltModel(object):
             for name in self.samplenames:
                 outputfh.write("\t{}\n".format(name))
 
-        if self.comps:
-            outputfh.write("Principle components for QC purposes are stored, dimensions={}".format(self.comps.shape))
+        if self.comps is not None:
+            outputfh.write("\nPrinciple components for QC purposes are stored, dimensions={}\n\n".format(self.comps.shape))
 
 
 def save_model(model, dest_path):

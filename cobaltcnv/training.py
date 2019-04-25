@@ -52,7 +52,8 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
-    return components, all_params, transformed
+    transformed_zscored = (transformed - np.median(transformed, axis=1)) / transformed.std(axis=1)
+    return components, all_params, transformed_zscored
 
 
 def split_bychr(regions):
@@ -141,7 +142,7 @@ def gen_chunk_indices(regions, chunksize, cluster_width=50, skip_chunk_size_chec
     return index_lists
 
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac, cluster_width):
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac, cluster_width):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -168,24 +169,7 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, max_cv, chun
     depth_matrix, sample_names = util.read_data_bed(depths_path)
     regions = util.read_regions(depths_path)
 
-    if max_cv is not None:
-        logging.info("Removing samples with depth CV > {}".format(max_cv))
-        cvs = util.calc_depth_cv(depth_matrix)
-        which = cvs > max_cv
-        if all(which):
-            logging.error("All samples have CV > {} !".format(max_cv))
-            return
-
-        if sum(which)==0:
-            logging.info("No samples have CV < {}".format(max_cv))
-
-        for i in range(len(cvs)):
-            if which[i]:
-                logging.info("Removing sample {} (CV={:.4f})".format(sample_names[i], cvs[i]))
-
-        depth_matrix = util.remove_samples_max_cv(depth_matrix, max_cv=max_cv)
-
-    logging.info("Beginning new training run removing {:.2f}% of variance and chunk size {}".format(100.0*var_cutoff, chunk_size))
+    logging.info("Beginning new training run removing {:.2f}% of variance and chunk size {} and cluster width {}".format(100.0*var_cutoff, chunk_size, cluster_width))
 
     if use_depth_mask:
         logging.info("Creating target mask")
