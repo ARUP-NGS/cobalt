@@ -544,7 +544,7 @@ def run_qc(model_path, depths_path, outputfh):
     """
     if outputfh is None:
         outputfh = sys.stdout
-    else
+    else:
         outputfh = open(outputfh)
 
     cmodel = model.load_model(model_path)
