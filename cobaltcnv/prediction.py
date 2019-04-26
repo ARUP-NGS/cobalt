@@ -540,9 +540,15 @@ def run_qc(model_path, depths_path, outputfh):
     if outputfh is None:
         outputfh = sys.stdout
 
+
+
     cmodel = model.load_model(model_path)
+
+    if not hasattr(cmodel, 'comps') or cmodel.comps is None:
+        raise ValueError('Sorry, looks like the model {} does not contain stored data needed to compute QC metrics, please re-generate the model with cobalt 0.7.1 or later')
+
     sample_depths, sample_names = util.read_data_bed(depths_path)
-    logging.info("Computing QC metrics for {} sample{}".format(len(sample_names), 's' if len(sample_names)>1 else ''))
+    logging.info("Computing QC metrics for {} sample{}".format(len(sample_names), 's' if len(sample_names) > 1 else ''))
     outputfh.write("sample,mean_distance,score\n")
 
     for i, name in enumerate(sample_names):

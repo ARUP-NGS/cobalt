@@ -55,12 +55,8 @@ Additional options for training:
 Approximate number of targets to include in one 'chunk'. Results are relatively insensitive to this value, but training
 will become slower if this is much greater than 10,000 or so. Values less than 100 seem like a bad idea.
 
-    --max-cv [1.0]
-Cobalt by default will remove background samples where the coefficient of variation of depths over targets is greater than a certain
-value (by default 1.0). If you don't want any samples removed, set this number to be very high.
-
     --no-mask [False]
-Cobalt by default will ignore very low depth, very high depth, or highly variable targets during training, this is called target 'masking' This flag disables the masking feature and cobalt will try to fit every target. Note that for some targets fitting
+Cobalt by default will ignore very low depth, very high depth, or highly variable targets during training, this is called target 'masking'. Using this flag disables the masking feature and cobalt will try to fit every target. Note that for some targets fitting
 may still be impossible, for instance if every background sample has zero depth.
 
     --var-cutoff [0.90]
@@ -77,6 +73,9 @@ Fraction of targets to mask due to high depth. If this is set to X, then the Xth
 
     --high-cv-trim-frac [0.01]
 Fraction of targets to mask due to high coefficient of variation (CV). Targetwise CV is computed for each target, then the Xth highest are masked.
+
+    --cluster-width [50]
+Number of adjacent regions to include in a chunk. The effect of changing this value is likely to be small, but might be fun to play with for fine-tuning
 
 We recommend at least 50 samples for training. Most importantly, the samples use for training MUST represent the
 type of conditions used to create the test samples. For instance, training samples should have insert sizes,
@@ -169,6 +168,17 @@ In the remaining two targets CNV detection is predicted to be relatively accurat
 The intent behind this feature is to enable users to create subsets of targeted regions that are associated with confident CNV calls.
 For instance, when designing a new CNV detection assay it may be desirable to exclude low-confidence regions or masked regions.
 By processing the BED file designers can easily remove masked or poorly performing regions to create a set of high-confidence targets.
+
+
+### Generating sample QC metrics (new in version 0.7.1)
+
+Cobalt has the ability to compute a metric that reflects how 'close' a given sample is to those samples used to create the background. Small values
+indicate that the sample is far away, and CNV calls might not reflect actual genomic events. To compute a QC value, use
+
+    cobalt qc -m [model path] -d [sample depths] -o [output csv file]
+
+The output file is in .csv format, and contains one line for each sample in the 'sample depths' file. The line includes the sample name, the mean distance to the background samples (less is better), and the qc score (less is worse).
+Values for the QC score range from 0-1, with 1 indicating the sample is very close to other background samples, and 0 indicating its really far away.  In practice, values greater than about 0.75 indicate an OK fit, while values less than about 0.6 indicate very poor fit (with those in between being questionable). The format of the sample depths file is identical to that used for prediction (BED, with each row indicating depths for one target).
 
 
 ### Creating a depth BED file for training
