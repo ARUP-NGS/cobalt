@@ -67,7 +67,7 @@ if __name__=="__main__":
     qc = subparsers.add_parser('qc', help="Compute QC metrics for a sample")
     qc.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
     qc.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
-    qc.add_argument("--include-backgrounds", "-i", help="Include background samples in output", action='store_true')
+    qc.add_argument("-o", "--output", help="Output path for QC results", default=None)
 
     # plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
     # plot.add_argument("--model", "-m", help="Model file")
@@ -123,7 +123,7 @@ if __name__=="__main__":
                            samplename=args.name)
 
     elif args.subparser_name == "qc":
-        prediction.run_qc(args.model, args.depths, args.include_backgrounds)
+        prediction.run_qc(args.model, args.depths, args.output)
 
     elif args.subparser_name == "plot":
         raise NotImplemented()

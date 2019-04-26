@@ -13,7 +13,6 @@ def test_model_train_save_load(tmpdir, bknd_depths_100):
                    modelpath,
                    use_depth_mask=True,
                    var_cutoff=0.95,
-                   max_cv=1.0,
                    chunk_size=37,
                    min_depth=20,
                    low_depth_trim_frac=0.01,
@@ -36,7 +35,6 @@ def test_model_train_save_load_no_mask(tmpdir, bknd_depths_100):
                    modelpath,
                    use_depth_mask=False,
                    var_cutoff=0.95,
-                   max_cv=1.0,
                    chunk_size=37,
                    min_depth=20,
                    low_depth_trim_frac=0.01,
@@ -80,7 +78,6 @@ def test_model_load_qc(tmpdir, bknd_depths_100):
                    modelpath,
                    use_depth_mask=True,
                    var_cutoff=0.95,
-                   max_cv=1.0,
                    chunk_size=37,
                    min_depth=20,
                    low_depth_trim_frac=0.01,
@@ -98,8 +95,8 @@ def test_model_load_qc(tmpdir, bknd_depths_100):
     point = qc.project_sample(mod, transformed_depths)
     assert len(point) == 2
 
-    mean_dist = qc.compute_mean_dist(mod, transformed_depths)
-    assert mean_dist == pytest.approx(37.464)
+    mean_dist, score = qc.compute_mean_dist(mod, transformed_depths)
+    assert mean_dist == pytest.approx(5.3540836)
 
 def test_compute_background_pca():
     params = [ # Only need to populate index 2

@@ -50,14 +50,33 @@ def project_sample(cmodel, sample_transformed_depths):
     projection = standardized_depths.dot(cmodel.directions)
     return projection
 
-# def distance_zscore(cmodel, point):
-#     """
-#     Compute the mean distance of the given point to each other 2-d point from cmodel.comps (the projection
-#     of each background sample along the first and second components), then divide by
-#     :param cmodel:
-#     :param point:
-#     :return:
-#     """
+
+def dist_kernel(point, cmodel):
+    """
+    Transform the given values (typically distances from a point to a set of background samples) by
+    a logistic-like function, then return the average of the top 10 values after transformation.
+    This provides a measure of how 'close' some point is to other background samples. Values near 1
+    indicate there are a lot of nearby background samples, while small values indicate the sample is
+    pretty far away from most other points.
+
+    We only look at the top 10 closest points because a) We want this metric to be relatively stable
+    as the number of background samples changes (and there should always be more than 10), and b) we
+    don't really care about far away samples, we just want to see if there are at least a handful of
+    close samples
+
+    :param point: 2d numpy array
+    :param cmodel: Cobalt model (must have qc information stored)
+    :return: Mean distance to background samples, and Value from 0-1, 1 meaning it's close to background samples, 0 meaning it's really far away
+    """
+
+    d = np.power(cmodel.comps[:, 0:2] - point, 2)
+    dists = np.sqrt(d[:, 0] + d[:, 1])
+    background_pairwise_dists = pdist(cmodel.comps[:, 0:2])
+    mean_bknd_dist = np.mean(background_pairwise_dists)
+    x = 2.0 - 2.0 / (1.0 + np.exp(-dists/mean_bknd_dist))
+    topx = np.sort(x)[max(0, x.shape[0]-10):x.shape[0]]
+    return np.mean(dists), np.mean(topx)
+
 
 def compute_mean_dist(cmodel, sample_transformed_depths):
     """
@@ -72,13 +91,9 @@ def compute_mean_dist(cmodel, sample_transformed_depths):
 
     :param cmodel: Cobalt model
     :param sample_transformed_depths: Prepped and transformed depths
-    :return: Standardized distance to background samples
+    :return: Raw mean distance to background samples, mean closeness to nearest background samples
     """
     projection = project_sample(cmodel, sample_transformed_depths)
-    d = np.power(cmodel.comps[:, 0:2] - projection, 2)
-    mean_dist = np.sum(np.sqrt(d[:,0] + d[:,1])) / cmodel.comps.shape[0]
-    background_pairwise_dists = pdist(cmodel.comps[:,0:2])
-    mean_bknd_dist = np.mean(background_pairwise_dists)
-    std_bknd_dist = np.std(background_pairwise_dists)
-    return np.abs((mean_dist - mean_bknd_dist) / std_bknd_dist)
+    mean_dist, qc_score = dist_kernel(projection, cmodel)
+    return mean_dist, qc_score
 

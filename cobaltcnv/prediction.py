@@ -530,22 +530,26 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
         if cnv.quality >= min_quality:
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
 
-def run_qc(model_path, depths_path, include_bknds, outputfh=sys.stdout):
+def run_qc(model_path, depths_path, outputfh):
+    """
+    Emit basic QC info to the given output filehandle in CSV format
+    :param model_path: Path to a cobalt model with QC info (comps & directions) stored
+    :param depths_path: Path to depths file
+    :param outputfh: File handle to write results to (if None write to sys.stdout)
+    """
+    if outputfh is None:
+        outputfh = sys.stdout
+
     cmodel = model.load_model(model_path)
     sample_depths, sample_names = util.read_data_bed(depths_path)
     logging.info("Computing QC metrics for {} sample{}".format(len(sample_names), 's' if len(sample_names)>1 else ''))
-    outputfh.write("")
-    outputfh.write("sample,pc1,pc2,distance\n")
-    if include_bknds:
-        for i, name in enumerate(cmodel.samplenames):
-            print("{},{:.2f},{:.2f},{:.3f}".format(name, cmodel.comps[i,0], cmodel.comps[i,1], ))
-
+    outputfh.write("sample,mean_distance,score\n")
 
     for i, name in enumerate(sample_names):
         depths = np.matrix(sample_depths[:, i]).reshape((sample_depths.shape[0], 1))
         _, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
-        mean_dist = qc.compute_mean_dist(cmodel, transformed_depths)
-        outputfh.write("{},{:.3f}\n".format(name, mean_dist))
+        mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
+        outputfh.write("{},{:.3f},{:.4f}\n".format(name, mean_dist, score))
 
 
 def predict(model_path,
