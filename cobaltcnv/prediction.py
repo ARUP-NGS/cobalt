@@ -544,8 +544,8 @@ def run_qc(model_path, depths_path, outputfh):
     """
     if outputfh is None:
         outputfh = sys.stdout
-
-
+    else
+        outputfh = open(outputfh)
 
     cmodel = model.load_model(model_path)
 
@@ -561,6 +561,11 @@ def run_qc(model_path, depths_path, outputfh):
         _, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
         mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
         outputfh.write("{},{:.3f},{:.4f}\n".format(name, mean_dist, score))
+
+    try:
+        outputfh.close()
+    except Exception as ex:
+        logging.debug("Error closing output stream for QC writing: {}".format(ex))
 
 
 def predict(model_path,
