@@ -53,8 +53,10 @@ def project_sample(cmodel, sample_transformed_depths):
 
 def dist_kernel(point, cmodel):
     """
-    Transform the given values (typically distances from a point to a set of background samples) by
-    a logistic-like function, then return the average of the top 10 values after transformation.
+    Compute the distance from the given (2D) point to all other background points stored in cmodel.comps,
+    then transform those values  by a logistic-like function, then return the average of the top 10 values
+    after transformation.
+
     This provides a measure of how 'close' some point is to other background samples. Values near 1
     indicate there are a lot of nearby background samples, while small values indicate the sample is
     pretty far away from most other points.
@@ -80,14 +82,9 @@ def dist_kernel(point, cmodel):
 
 def compute_mean_dist(cmodel, sample_transformed_depths):
     """
-    Project the transformed depths onto the eigenvectors stored in the model, then compute the mean
-    distance of the resulting point to each point stored in the model (which was computed from samples
-    used to create the model). Do the same thing for ALL pairwise distances in the background
-    and report the distance of the query sample, z-scored by the distances among background samples.
-
-    The result quantifies how distant the query sample is from the background samples, relative to the
-    distances of the background samples to oen another. Bigger values mean the sample is farther from
-    the norm, values above 2 or so are pretty suspicious.
+    Project the transformed depths onto the (2) eigenvectors stored in the model resulting in a 2D point
+     that can be compared to simular points stored for background samples (in cmodel.comps). Then
+     calculate a score that reflects how close the point is to the background points and return it
 
     :param cmodel: Cobalt model
     :param sample_transformed_depths: Prepped and transformed depths
