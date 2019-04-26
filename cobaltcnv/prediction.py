@@ -474,6 +474,11 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
     """
     regions, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
 
+    if hasattr(cmodel, 'comps') and cmodel.comps is not None:
+        mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
+        logging.info("Sample QC metric: {:.4f}".format(score))
+
+
     return construct_hmms_call_states(cmodel,
                                       regions,
                                       transformed_depths,
