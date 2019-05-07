@@ -19,7 +19,7 @@ along with Cobalt.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import sys
 import os
-from cobaltcnv import util, model, hmm, transform, vcf
+from cobaltcnv import util, model, hmm, transform, vcf, qc
 from cobaltcnv import __version__
 from cobaltcnv.distributions import PosDependentSkewNormal
 import logging
@@ -512,6 +512,24 @@ def has_x_regions(regions):
     return any(r[0] == 'X' or r[0] == 'chrX' for r in regions)
 
 
+def mask_prepare_transform_depths(cmodel, depths):
+    """
+    Apply a region mask in the cmodel if present to the given depths, then 'prep' them and transform
+    :param cmodel: Cobalt model
+    :param depths: Raw sample depths
+    :return: Tuple of Regions with mask targets removed, transformed depths
+    """
+    if hasattr(cmodel, 'mask') and cmodel.mask is not None:
+        logging.info("Applying region mask, removing {} targets".format( len(cmodel.regions)-sum(cmodel.mask)))
+        depths = depths[cmodel.mask, :]
+        regions = [r for r,m in zip(cmodel.regions, cmodel.mask) if m]
+
+    prepped_depths = transform.prep_data(depths)
+    transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
+    return regions, transformed_depths
+
+
+
 def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, trim_lowqual_edges, emit_each_target_fh=None):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
@@ -522,15 +540,12 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, trim_lowqual_e
     :param assume_female: Use female X chrom model (if false, use male, if None, infer)
     :return: List of CNVCall objects representing all calls
     """
-    if hasattr(cmodel, 'mask') and cmodel.mask is not None:
-        logging.info("Applying region mask, removing {} targets".format( len(cmodel.regions)-sum(cmodel.mask)))
-        depths = depths[cmodel.mask, :]
-        regions = [r for r,m in zip(cmodel.regions, cmodel.mask) if m]
+    regions, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
 
-    prepped_depths = transform.prep_data(depths)
-    # colmeans = np.median(prepped_depths, axis=1)
-    # centered = prepped_depths - colmeans # HOW IS THIS SOMEHOW NOT REQUIRED??
-    transformed_depths = transform.transform_by_genchunks(prepped_depths, cmodel)
+    if hasattr(cmodel, 'comps') and cmodel.comps is not None:
+        mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
+        logging.info("Sample QC metric: {:.4f}".format(score))
+
 
     return construct_hmms_call_states(cmodel,
                                       regions,
@@ -588,6 +603,38 @@ def emit_vcf(cnv_calls, samplename, min_quality, ref_path, output_fh):
     for cnv in cnv_calls:
         if cnv.quality >= min_quality:
             output_fh.write(vcf.cnv_to_vcf(cnv, ref, min_quality) + "\n")
+
+def run_qc(model_path, depths_path, outputfh):
+    """
+    Emit basic QC info to the given output filehandle in CSV format
+    :param model_path: Path to a cobalt model with QC info (comps & directions) stored
+    :param depths_path: Path to depths file
+    :param outputfh: File handle to write results to (if None write to sys.stdout)
+    """
+    if outputfh is None:
+        outputfh = sys.stdout
+    else:
+        outputfh = open(outputfh, "w")
+
+    cmodel = model.load_model(model_path)
+
+    if not hasattr(cmodel, 'comps') or cmodel.comps is None:
+        raise ValueError('Sorry, looks like the model {} does not contain stored data needed to compute QC metrics, please re-generate the model with cobalt 0.7.1 or later')
+
+    sample_depths, sample_names = util.read_data_bed(depths_path)
+    logging.info("Computing QC metrics for {} sample{}".format(len(sample_names), 's' if len(sample_names) > 1 else ''))
+    outputfh.write("sample,mean_distance,score\n")
+
+    for i, name in enumerate(sample_names):
+        depths = np.matrix(sample_depths[:, i]).reshape((sample_depths.shape[0], 1))
+        _, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
+        mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
+        outputfh.write("{},{:.3f},{:.4f}\n".format(name, mean_dist, score))
+
+    try:
+        outputfh.close()
+    except Exception as ex:
+        logging.debug("Error closing output stream for QC writing: {}".format(ex))
 
 
 def predict(model_path,

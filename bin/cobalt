@@ -41,12 +41,13 @@ if __name__=="__main__":
     train.add_argument("--var-cutoff", help="Proportion of variance to remove via SVD", type=float, default=0.90)
     train.add_argument("--no-mask", help="Turn off site masking", action='store_true', default=False)
     train.add_argument("--chunk-size", help="Number of sites to include in a chunk", type=int, default=1000)
-    train.add_argument("--max-cv", help="Maximum depth CV for sample inclusion", type=float, default=1.0)
     train.add_argument("--min-depth", help="Minimum mean depth of target for inclusion in training", type=float, default=20.0)
     train.add_argument("--low-depth-trim-frac", help="Fraction of targets to remove due to low depth", type=float, default=0.01)
     train.add_argument("--high-depth-trim-frac", help="Fraction of targets to remove due to high depth", type=float, default=0.01)
     train.add_argument("--high-cv-trim-frac", help="Fraction of targets to remove due to high target coeff. variation", type=float,
                        default=0.01)
+    train.add_argument("--cluster-width", help="Number of adjacent targets to include in a chunk", type=int,
+                       default=50)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
     predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
@@ -64,6 +65,10 @@ if __name__=="__main__":
     predict.add_argument("-n", "--name", required=False, type=str, help="Sample name in emitted VCF")
     predict.add_argument("--trim-edges", required=False, default=False, help="Trim loq quality edge targets from CNV calls", action='store_true')
 
+    qc = subparsers.add_parser('qc', help="Compute QC metrics for a sample")
+    qc.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
+    qc.add_argument("--depths", "-d", help="BED-formatted file with raw sample depths", required=True)
+    qc.add_argument("-o", "--output", help="Output path for QC results", default=None)
 
     # plot = subparsers.add_parser('plot', help="Plot emission distributions and transformed depths for a range of sites")
     # plot.add_argument("--model", "-m", help="Model file")
@@ -91,12 +96,12 @@ if __name__=="__main__":
                        args.save_model, 
                        use_depth_mask=not args.no_mask, 
                        var_cutoff=args.var_cutoff,
-                       max_cv=args.max_cv,
                        chunk_size=args.chunk_size,
                        min_depth=args.min_depth,
                        low_depth_trim_frac=args.low_depth_trim_frac,
                        high_depth_trim_frac=args.high_depth_trim_frac,
-                       high_cv_trim_frac=args.high_cv_trim_frac)
+                       high_cv_trim_frac=args.high_cv_trim_frac,
+                       cluster_width=args.cluster_width)
 
     elif args.subparser_name == "predict":
         assume_female = None
@@ -118,6 +123,9 @@ if __name__=="__main__":
                            emit_target_path=args.target_info,
                            samplename=args.name,
                            trim_lowqual_edges=args.trim_edges)
+
+    elif args.subparser_name == "qc":
+        prediction.run_qc(args.model, args.depths, args.output)
 
     elif args.subparser_name == "plot":
         raise NotImplemented()
