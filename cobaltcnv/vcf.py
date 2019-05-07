@@ -22,7 +22,7 @@ def cnv_to_vcf(cnv, ref, passqual):
     :param cnv:
     """
     refbase = ref.fetch(cnv.chrom, cnv.start, cnv.start+1)
-    if cnv.copynum < 2:
+    if cnv.copynum < cnv.ref_ploidy:
         alt = "<DEL>"
     else:
         alt = "<DUP>"

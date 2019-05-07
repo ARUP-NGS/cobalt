@@ -75,6 +75,14 @@ class ProtoCNV(object):
         self.variances.append(variance)
 
     @property
+    def inner_start(self):
+        return min(self.all_regions[i][1] for i in self.region_indices)
+
+    @property
+    def inner_end(self):
+        return max(self.all_regions[i][2] for i in self.region_indices)
+
+    @property
     def chrom(self):
         """
         Return the chromosome on which the CNV lies (computed on the fly from the list of included regions
@@ -85,7 +93,46 @@ class ProtoCNV(object):
 
         return list(chroms)[0]
 
-    def build_call(self):
+    def trim_lowqual_edge_regions(self):
+        """
+        Experimental feature to remove regions on the either edge of the CNV that are much lower quality than the
+        remaining regions. This is to avoid the situation where one very high confidence region borders a much lower
+        confidence region, leading to a combined quality is low enough to cause the entire call to be ignored. In such
+        cases its better to retain the few good targets.
+        """
+        if len(self.region_indices) < 2:
+            return
+
+        max_to_trim = min(len(self.region_indices) // 2 + 1, 5)  # Dont remove more than this number of targets from either edge
+
+        qmean = np.mean(self.quals)
+        left_trim = 0
+        for i in range(1, max_to_trim):
+            newqual = np.mean(self.quals[0:i])
+            r = qmean / newqual
+            if qmean / newqual > 1.25:
+                left_trim = i
+                qmean = np.mean(self.quals[left_trim:])
+
+        qmean = np.mean(self.quals)
+        right_trim = len(self.region_indices)
+        for j in range(1, max_to_trim):
+            newqual = np.mean(self.quals[len(self.region_indices) - j:])
+            if qmean / newqual  > 1.25:
+                right_trim = len(self.region_indices) - j
+                qmean = np.mean(self.quals[0:right_trim])
+
+        if left_trim > 0 or right_trim < len(self.region_indices):
+            logging.info("Trimming CNV with quals {} (prev qual {:.4f}) to [{}:{}] (new qual {:.4f})".format(",".join("{:.3f}".format(x) for x in self.quals), np.mean(self.quals), left_trim, right_trim, np.mean(self.quals[left_trim:right_trim])))
+
+        logging.debug("Trimming {} left and {} right regions from CNV {}:{}-{} (previously had {} targets)".format(left_trim, right_trim, self.chrom, self.inner_start, self.inner_end, len(self.region_indices)))
+        self.region_indices = self.region_indices[left_trim:right_trim]
+        self.quals = self.quals[left_trim:right_trim]
+        self.means = self.means[left_trim:right_trim]
+        self.variances = self.variances[left_trim:right_trim]
+
+
+    def build_call(self, trim_lowqual_edges=False):
         """
         Create and return a single CNVCall object, with attributes set appropriately using the data stored in
         region_indices, quals, means, etc.
@@ -93,21 +140,24 @@ class ProtoCNV(object):
         :return: CNVCall object
         """
 
-        chr = self.chrom
-        inner_start = min(self.all_regions[i][1] for i in self.region_indices)
-        inner_end = max(self.all_regions[i][2] for i in self.region_indices)
+        if trim_lowqual_edges:
+            self.trim_lowqual_edge_regions()
+
+        chrom = self.chrom
+        in_start = self.inner_start
+        in_end = self.inner_end
 
         try:
-            outer_start = max(r[2] for r in self.all_regions if r[2] < inner_start and r[0] == chr)
+            outer_start = max(r[2] for r in self.all_regions if r[2] < in_start and r[0] == chrom)
         except:
-            outer_start = inner_start
+            outer_start = in_start
 
         try:
-            outer_end = min(r[1] for r in self.all_regions if r[1] > inner_end and r[0] == chr)
+            outer_end = min(r[1] for r in self.all_regions if r[1] > in_end and r[0] == chrom)
         except:
-            outer_end = inner_end
+            outer_end = in_end
 
-        call = CNVCall(self.chrom, inner_start, inner_end, self.copy_number, self.ref_ploidy, 0, len(self.region_indices))
+        call = CNVCall(self.chrom, in_start, in_end, self.copy_number, self.ref_ploidy, 0, len(self.region_indices))
         call.outer_start = outer_start
         call.outer_end = outer_end
         call.quality = np.mean(self.quals)
@@ -120,7 +170,7 @@ class ProtoCNV(object):
 
 
 
-def _create_hmm(params, mods, alpha, beta, states_to_use=None):
+def _create_hmm(params, mods, alpha, beta, states_to_use=None, ref_ploidy=2):
     """
     Create an HMM object using emission distribution params from the pcamode
     :param pcamodel:
@@ -146,16 +196,16 @@ def _create_hmm(params, mods, alpha, beta, states_to_use=None):
             copy_number = 0
         elif mod < 0.75:
             desc = "Het deletion"
-            copy_number = 1
+            copy_number = 1 * ref_ploidy / 2.0
         elif mod < 1.25:
             desc = "Diploid"
-            copy_number = 2
+            copy_number = 2 * ref_ploidy / 2.0
         elif mod < 1.75:
             desc = "Het duplication"
-            copy_number = 3
+            copy_number = 3 * ref_ploidy / 2.0
         else:
             desc = "Hom dup / amplification"
-            copy_number = 4
+            copy_number = 4 * ref_ploidy / 2.0
 
 
         dist = PosDependentSkewNormal(em_params, user_desc=desc, copy_number=copy_number)
@@ -210,7 +260,7 @@ def emit_site_info(model_path, emit_bed=False):
 
 
 
-def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
+def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edges):
     """
     A very simple segmentation algorithm that just groups calls based on whether or not they
     have the same most-likely copy number state. Quality is the geometric mean of those probabilities
@@ -218,15 +268,19 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
     :param stateprobs: State probabilities (from hmm.forward_backward)
     :param modelhmm: HMM instance with emission distributions
     :param ref_ploidy: Reference ploidy, used to construct CNVCall object
+    :param trim_low_quality_edges: If True, use special trimming algorithm to remove low quality edge targets from CNVs
     :return: List of CNVCall objects
     """
 
     cnvs = []
-    diploid_state = next( (i,em) for i,em in enumerate(modelhmm.em) if em.copy_number()==2)[0]
+    diploid_state = next( (i,em) for i,em in enumerate(modelhmm.em) if em.copy_number()==ref_ploidy)[0]
     prev_state = diploid_state
     current_cnv = None
 
     for j, (region, probs) in enumerate(zip(regions, stateprobs)):
+
+        if region[1] == 196743945:
+            print("hi!")
 
         state = np.argmax(probs)
         end_existing_cnv = False
@@ -236,7 +290,10 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
             if state == diploid_state:
                 continue
             elif region[0] == current_cnv.chrom:
-                current_cnv.add_region(j, probs[state], copynumber_expectation(probs), copynumber_variance(probs))
+                current_cnv.add_region(j,
+                                       probs[state],
+                                       copynumber_expectation(probs, modelhmm=modelhmm),
+                                       copynumber_variance(probs, modelhmm=modelhmm))
             else:
                 end_existing_cnv = True
                 make_new_cnv = True
@@ -254,18 +311,21 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy):
 
         prev_state = state
         if end_existing_cnv and current_cnv is not None:
-            cnvs.append(current_cnv.build_call())
+            cnvs.append(current_cnv.build_call(trim_lowqual_edges=trim_low_quality_edges))
             current_cnv = None
 
         if make_new_cnv:
             if current_cnv is not None:
                 raise ValueError('Cant make a new CNV while one already exists')
             current_cnv = ProtoCNV(regions, modelhmm.em[state].copy_number(), ref_ploidy)
-            current_cnv.add_region(j, probs[state], copynumber_expectation(probs), copynumber_variance(probs))
+            current_cnv.add_region(j,
+                                   probs[state],
+                                   copynumber_expectation(probs, modelhmm=modelhmm),
+                                   copynumber_variance(probs, modelhmm=modelhmm))
 
     # Dont forget to add the last CNV if we end traversing regions still in CNV state
     if current_cnv is not None:
-        cnvs.append(current_cnv.build_call())
+        cnvs.append(current_cnv.build_call(trim_lowqual_edges=trim_low_quality_edges))
 
     return cnvs
 
@@ -282,33 +342,34 @@ def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
         flt_params.append([param for region, param in zip(regions, ps) if region[0] in chroms_to_include])
     return flt_regions, flt_depths, flt_params
 
-def copynumber_expectation(probs):
+def copynumber_expectation(probs, modelhmm):
     """
     Given probabilities for a single target (typically computed via forward-backward), take them to be a discrete
      probability distribution and compute the expectation of the copy number.
 
-    !! This assumes that the copy numbers associated with each state are the INDEX of the state, so that probs[0]
-    describes the probability of having 0 copies, probs[2] is probability of diploid, etc. !!
-
     :param probs: List of state probabilities
+    :param modelhmm: HMM, needed to associate states with copy numbers
+    :param ref_ploidy: Usually two, should be 1 for Y anc X on males
     :return: Expectation of copy number
     """
-    return sum( i*p for i,p in enumerate(probs) )
+    return sum( modelhmm.em[i].copy_number()*p for i,p in enumerate(probs) )
 
 
-def copynumber_variance(probs):
+def copynumber_variance(probs, modelhmm):
     """
     Return variance in copy number for a single target, computed similarly to
     :param probs: List of state probabilities
-    :return:
+    :return: The variance in the copy number estimate
     """
-    expectation = copynumber_expectation(probs)
+
+    expectation = copynumber_expectation(probs, modelhmm)
     # Floating point issues can occasionally produce a negative variance, so we truncate at 0.0 here
-    variance = max(0.0, sum( i*i*p for i,p in enumerate(probs) ) - expectation * expectation)
+    # Looks long, but basically we compute variance as E[X^2] - E[X]^2, where X is the copy number
+    variance = max(0.0, sum( modelhmm.em[i].copy_number()*modelhmm.em[i].copy_number()*p for i,p in enumerate(probs) ) - expectation * expectation)
     return variance
 
 
-def emit_target_info(region, probs, fh, std=None, ref_ploidy=2):
+def emit_target_info(region, probs, fh, modelhmm, std=None, ref_ploidy=2):
     """
     Compute the copy-number expectation, stdev and log2 of the expectation for the given probability list
      and write them to the given file handle
@@ -316,8 +377,8 @@ def emit_target_info(region, probs, fh, std=None, ref_ploidy=2):
     :param probs: List of state probabilties
     :param fh: File-like object to write to
     """
-    cn_exp = copynumber_expectation(probs)
-    cn_var = copynumber_variance(probs)
+    cn_exp = copynumber_expectation(probs, modelhmm)
+    cn_var = copynumber_variance(probs, modelhmm)
 
     try:
         cn_stdf = np.sqrt(cn_var)
@@ -354,7 +415,7 @@ def standardize_depths(transformed_depths, params):
     diploid_variances = np.array([p[2] for p in params])
     return (transformed_depths - diploid_means) / np.sqrt(diploid_variances)
 
-def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, emit_each_target_fh=None):
+def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta, use_male_chrcounts, trim_lowqual_edges, emit_each_target_fh=None):
     """
     Construct HMMs using information stored in model, compute state probabilities for all targets, and
     run segmentation algorithm on state probability matrices to generate CNV calls.
@@ -364,6 +425,7 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     :param alpha: Transition matrix parameter a
     :param beta: Transition matrix parameter b
     :param use_male_chrcounts: If true, assume there's only one X chromosome and modify potential CN states accordingly
+    :param trim_lowqual_edges: If true, trim off low quality edge targets from CNV calls
     :param emit_each_target_fh: If given, must be a file-like object to which target-specific information will be written
     :return: List of CNVCall objects
     """
@@ -374,13 +436,13 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     y_regions, y_depths, y_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.Y_CHROM)
 
     logging.info("Determining autosomal copy number states and qualities")
-    autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta)
+    autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta, ref_ploidy=2)
 
     # diploid state is the INDEX of the column in state probs that corresponds to diploid, typically 2
     diploid_state = next((i, em) for i, em in enumerate(autosomal_model.em) if em.copy_number() == 2)[0]
     autosomal_state_probs = autosomal_model.forward_backward(autosomal_depths)[1:]
     autosomal_std = standardize_depths(autosomal_depths, autosomal_params[diploid_state])
-    autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model, ref_ploidy=2)
+    autosomal_cnvs = segment_cnvs(autosomal_regions, autosomal_state_probs, autosomal_model, ref_ploidy=2, trim_low_quality_edges=trim_lowqual_edges)
 
     x_cnvs = []
     x_state_probs = []
@@ -394,11 +456,11 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
             ref_ploidy = 2
 
         logging.info("Determining X chromosome copy number states and qualities")
-        x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use)
+        x_model = _create_hmm(x_params, cmodel.mods, alpha, beta, states_to_use=states_to_use, ref_ploidy=ref_ploidy)
         # x_diploid_state = next((i, em) for i, em in enumerate(x_model.em) if em.copy_number() == 2)[0]
         x_state_probs = x_model.forward_backward(x_depths)[1:]
         x_std = standardize_depths(x_depths, x_params[diploid_state])
-        x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model, ref_ploidy=ref_ploidy)
+        x_cnvs = segment_cnvs(x_regions, x_state_probs, x_model, ref_ploidy=ref_ploidy, trim_low_quality_edges=trim_lowqual_edges)
     else:
         logging.info("No X chromosome regions found, not calling CNVs on X chromosome")
 
@@ -408,11 +470,11 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     y_std = []
     if len(y_regions)>0 and use_male_chrcounts:
         logging.info("Determining Y chromosome copy number states and qualities")
-        y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4])
+        y_model = _create_hmm(y_params, cmodel.mods, alpha, beta, states_to_use=[0, 2, 4], ref_ploidy=1)
         # y_diploid_state = next((i, em) for i, em in enumerate(y_model.em) if em.copy_number() == 2)[0]
         y_state_probs = y_model.forward_backward(y_depths)[1:]
         y_std = standardize_depths(y_depths, y_params[diploid_state])
-        y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model, ref_ploidy=1)
+        y_cnvs = segment_cnvs(y_regions, y_state_probs, y_model, ref_ploidy=1, trim_low_quality_edges=trim_lowqual_edges)
     else:
         if use_male_chrcounts:
             logging.info("No Y chromosome regions found, not calling CNVs on X chromosome")
@@ -424,14 +486,19 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
         logging.info("Writing target specific information")
         emit_each_target_fh.write("#chrom start end mean_cn std_cn log2 dev\n".replace(" ", "\t"))
         for region, probs, std in zip(autosomal_regions, autosomal_state_probs, autosomal_std):
-            emit_target_info(region, probs, emit_each_target_fh, std)
+            emit_target_info(region, probs, emit_each_target_fh, modelhmm=autosomal_model, std=std, ref_ploidy=2)
 
         for region, probs, std in zip(x_regions, x_state_probs, x_std):
-            ref_ploidy = 1 if use_male_chrcounts else 2
-            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=ref_ploidy)
+            if use_male_chrcounts:
+                ref_ploidy = 1
+            else:
+                ref_ploidy = 2
+
+            emit_target_info(region, probs, emit_each_target_fh, modelhmm=x_model, std=std, ref_ploidy=ref_ploidy)
 
         for region, probs, std in zip(y_regions, y_state_probs, y_std):
-            emit_target_info(region, probs, emit_each_target_fh, std, ref_ploidy=1)
+            ref_ploidy = 1
+            emit_target_info(region, probs, emit_each_target_fh, modelhmm=y_model, std=std, ref_ploidy=ref_ploidy)
 
     return list(autosomal_cnvs) + list(x_cnvs) + list(y_cnvs)
 
@@ -462,7 +529,8 @@ def mask_prepare_transform_depths(cmodel, depths):
     return regions, transformed_depths
 
 
-def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_target_fh=None):
+
+def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, trim_lowqual_edges, emit_each_target_fh=None):
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
     :param cmodel: CobaltModel object
@@ -484,6 +552,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, emit_each_targ
                                       transformed_depths,
                                       alpha,
                                       beta,
+                                      trim_lowqual_edges=trim_lowqual_edges,
                                       use_male_chrcounts=not assume_female,
                                       emit_each_target_fh=emit_each_target_fh)
 
@@ -580,7 +649,8 @@ def predict(model_path,
             outputvcf=False,
             ref_path=None,
             emit_target_path=None,
-            samplename=None):
+            samplename=None,
+            trim_lowqual_edges=True):
     """
     Run the prediction algorithm to identify CNVs from a test sample, using eigenvectors and parameters stored in a model file
     :param model_path: Path to model file, generated via a call to trainpca.train(...)
@@ -618,7 +688,11 @@ def predict(model_path,
     else:
         logging.info("Assuming sample sex is male")
 
-    cnv_calls = call_cnvs(cmodel, depths, alpha, beta, assume_female, genome=genome, emit_each_target_fh=emit_each_target_fh)
+    cnv_calls = call_cnvs(cmodel, depths, alpha, beta,
+                          assume_female,
+                          genome=genome,
+                          trim_lowqual_edges=trim_lowqual_edges,
+                          emit_each_target_fh=emit_each_target_fh)
 
 
     output_fh = sys.stdout
