@@ -330,17 +330,33 @@ def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edg
     return cnvs
 
 
-def _filter_regions_by_chroms(regions, depths, params, chroms_to_include):
+def _chrom_include_exclude(chrom, chroms_to_include=None, chroms_to_exclude=None):
+    """
+    Return true if chrom is in chroms_to_include and not in chroms_to_exclude, with the catch
+    that if chroms_to_include or _exclude is None then don't filter on inclusion (or exclusion)
+    If both are None than everything will be included
+    :param chrom: Name of chromosome to test
+    :param chroms_to_include: List of chromosomes to match, or None to match all
+    :param chroms_to_exclude: List of chromosomes to exclude by, or None to never exclude
+    :return: True if included and not excluded
+    """
+    included = chroms_to_include is None or chrom in chroms_to_include
+    excluded = (not chroms_to_exclude is None) and chrom in chroms_to_exclude
+    return included and not excluded
+
+
+def _filter_regions_by_chroms(regions, depths, params, chroms_to_include, chroms_to_exclude):
     if len(regions) != len(depths):
         raise ValueError("Number of regions must be equal to number of depths")
     if len(regions) != len(params[0]):
         raise ValueError("Number of regions must be equal to number of parameters")
-    flt_depths = [depth for region, depth in zip(regions, depths) if region[0] in chroms_to_include]
-    flt_regions = [region for region in regions if region[0] in chroms_to_include]
+    flt_depths = [depth for region, depth in zip(regions, depths) if _chrom_include_exclude(region[0], chroms_to_include, chroms_to_exclude)]
+    flt_regions = [region for region in regions if _chrom_include_exclude(region[0], chroms_to_include, chroms_to_exclude)]
     flt_params = []
     for ps in params:
-        flt_params.append([param for region, param in zip(regions, ps) if region[0] in chroms_to_include])
+        flt_params.append([param for region, param in zip(regions, ps) if _chrom_include_exclude(region[0], chroms_to_include, chroms_to_exclude)])
     return flt_regions, flt_depths, flt_params
+
 
 def copynumber_expectation(probs, modelhmm):
     """
@@ -431,9 +447,9 @@ def construct_hmms_call_states(cmodel, regions, transformed_depths, alpha, beta,
     """
 
 
-    autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.AUTOSOMES)
-    x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.X_CHROM)
-    y_regions, y_depths, y_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, util.Y_CHROM)
+    autosomal_regions, autosomal_depths, autosomal_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, chroms_to_include=None, chroms_to_exclude=util.SEX_CHROMS)
+    x_regions, x_depths, x_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, chroms_to_include=util.X_CHROM, chroms_to_exclude=None)
+    y_regions, y_depths, y_params = _filter_regions_by_chroms(regions, transformed_depths, cmodel.params, chroms_to_include=util.Y_CHROM, chroms_to_exclude=None)
 
     logging.info("Determining autosomal copy number states and qualities")
     autosomal_model = _create_hmm(autosomal_params, cmodel.mods, alpha, beta, ref_ploidy=2)

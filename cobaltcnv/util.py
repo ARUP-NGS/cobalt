@@ -5,18 +5,10 @@ import numpy as np
 import time
 from collections import defaultdict
 
-AUTOSOMES=[str(x+1) for x in range(22)]
-X_CHROM="X"
-Y_CHROM="Y"
-SEX_CHROMS=[X_CHROM, Y_CHROM]
+X_CHROM=["X", "chrX"]
+Y_CHROM=["Y", "chrY"]
+SEX_CHROMS= X_CHROM + Y_CHROM
 
-# Dicts mapping chromosome names to expected counts
-CHROM_COUNTS_FEMALE=defaultdict(lambda x: 2)
-CHROM_COUNTS_FEMALE[Y_CHROM] = 0
-
-CHROM_COUNTS_MALE=defaultdict(lambda x: 2)
-CHROM_COUNTS_MALE[X_CHROM] = 1
-CHROM_COUNTS_MALE[Y_CHROM] = 1
 
 # Locations of pseudoautosomal regions on X chromosome, see https://www.ncbi.nlm.nih.gov/grc/human
 X_PAR1_B37 = [60001, 2699520]
