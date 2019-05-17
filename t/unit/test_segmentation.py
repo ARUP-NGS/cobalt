@@ -1,7 +1,7 @@
 
 import pytest
 from io import StringIO
-from cobaltcnv.prediction import segment_cnvs, copynumber_expectation, emit_target_info, ProtoCNV
+from cobaltcnv.prediction import segment_cnvs, copynumber_expectation, emit_target_info, ProtoCNV, _chrom_include_exclude
 
 class MockHMM(object):
 
@@ -388,5 +388,19 @@ def test_trim_lowqual_edges_thatcase():
     assert cnv.quality == pytest.approx(0.90995)
     assert cnv.start == 30
     assert cnv.end == 45
+
+
+@pytest.mark.parametrize("c, includes, excludes, expected", [
+    ('a', None, ['a', 'b', 'c'], False),
+    ('a', None, ['c', 'd', 'e'], True),
+    ('a', ['a', 'b', 'c'], None, True),
+    ('a', ['a', 'b', 'c'], ['c', 'd', 'e'], True),
+    ('a', ['a', 'b', 'c'], [], True),
+    ('a', ['b', 'c'], [], False),
+    ('a', [], [], False),
+    ('a', None, None, True),
+])
+def test_chrom_include_exclude(c, includes, excludes, expected):
+    assert _chrom_include_exclude(c, includes, excludes) == expected
 
 
