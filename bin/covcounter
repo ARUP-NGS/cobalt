@@ -16,26 +16,30 @@ def filter(r, min_mapq):
                 or (not r.is_proper_pair)
                 or r.mapping_quality < min_mapq)
 
-def count(args, readfilter):
+def count(args, ref_genome, readfilter):
     """
     Compute read counts over a list of regions for a single BAM file
     :param args: Tuple of (path to bam file, list of regions)
     :return: List of read counts, 1 entry for each region in input list
     """
     bampath, regions = args
-    alnfile = pysam.AlignmentFile(bampath)
+    if ref_genome:
+        alnfile = pysam.AlignmentFile(bampath, reference_filename=ref_genome)
+    else:
+        alnfile = pysam.AlignmentFile(bampath)
     counts = [alnfile.count(region[0], region[1], region[2], read_callback=readfilter) for region in regions]
     alnfile.close()
     return counts
 
-def coverage(bed, bams, threads, min_mapq):
+def coverage(bed, bams, threads, min_mapq, ref_genome):
 
     pool = mp.Pool( threads )
     print("#chrom\tstart\tend\t" + "\t".join([os.path.basename(b) for b in bams]))
+    #print("#chrom\tstart\tend\t" + "\t".join([b.split("/")[-3] for b in bams]))
     chunksize = 250
     chunks = []
     readfilter = partial(filter, min_mapq=min_mapq)
-    countfunc = partial(count, readfilter=readfilter)
+    countfunc = partial(count, ref_genome=ref_genome, readfilter=readfilter)
     for line in open(bed):
         if line.startswith("#"):
             continue
@@ -60,5 +64,6 @@ if __name__=="__main__":
     parser.add_argument("--bams", help="One or more BAM files" , nargs='+')
     parser.add_argument("--threads", help="Number of threads to use", type=int, default=2)
     parser.add_argument("--min-mapq", "-m", help="Minimum mapping quality of reads to count", type=int, default=10)
+    parser.add_argument("-r", "--reference", help="Reference genome fastq, required for .cram filet", default=None)
     args = parser.parse_args()
-    coverage(args.bed, args.bams, args.threads, args.min_mapq)
+    coverage(args.bed, args.bams, args.threads, args.min_mapq, args.reference)
