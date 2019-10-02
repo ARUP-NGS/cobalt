@@ -154,7 +154,6 @@ def fit_single(dmat, components, site, intermediate, id_outliers=True, sample_ma
 
     return a, shape, loc, which
 
-
 def fit_site2(dmat_raw, dmat_prepped, components, site, intermediate, mods, rmoutliers=False, min_depth=20):
     """
     Estimate distribution parameters for 'normal' (diploid, unadjusted), deletion (normal * 0.5) and
