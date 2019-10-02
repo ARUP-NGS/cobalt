@@ -48,6 +48,7 @@ if __name__=="__main__":
                        default=0.01)
     train.add_argument("--cluster-width", help="Number of adjacent targets to include in a chunk", type=int,
                        default=50)
+    train.add_argument("--emit-norm-depths", help="Write normalized / transformed depths to a file", required=False)
 
     predict = subparsers.add_parser('predict', help="Identify CNVs in a sample using a model")
     predict.add_argument("--model", "-m", help="Model file to use for prediction", required=True)
@@ -101,7 +102,8 @@ if __name__=="__main__":
                        low_depth_trim_frac=args.low_depth_trim_frac,
                        high_depth_trim_frac=args.high_depth_trim_frac,
                        high_cv_trim_frac=args.high_cv_trim_frac,
-                       cluster_width=args.cluster_width)
+                       cluster_width=args.cluster_width,
+                       norm_depths_output=args.emit_norm_depths)
 
     elif args.subparser_name == "predict":
         assume_female = None

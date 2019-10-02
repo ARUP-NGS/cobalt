@@ -18,9 +18,9 @@ along with Cobalt.  If not, see <https://www.gnu.org/licenses/>.
 
 
 import numpy as np
+import pandas as pd
 from cobaltcnv import util, model, transform, qc
 import logging
-import sys
 
 # The minimum size of a 'chunk' (list of regions over which the SVD is computed)
 MIN_CHUNK_SIZE = 100
@@ -141,8 +141,27 @@ def gen_chunk_indices(regions, chunksize, cluster_width=50, skip_chunk_size_chec
     index_lists = [np.where(indices == i)[0] for i in range(np.max(indices) + 1)]
     return index_lists
 
+def write_normed_depths(regions, samplenames, transformed_depths, output_path):
+    """
+    Write the given transformed depths, along with region info, to the given output path
+    :param regions: List of regions, must have length equal to first dimension as transformed_depths
+    :param transformed_depths: Depths to write, should be np.array
+    :param output_path: Path to write data to
+    """
+    if len(regions) != transformed_depths.shape[0]:
+        raise ValueError("Unequal number of regions and transformed depths ({} regions, {} transformed depths)".format(len(regions), transformed_depths.shape))
 
-def train(depths_path, model_save_path, use_depth_mask, var_cutoff, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac, cluster_width):
+    with open(output_path, "w") as ofh:
+        ofh.write("#chrom\tstart\tend\t")
+        ofh.write("\t".join(samplenames) + "\n")
+        for i, region in enumerate(regions):
+            ofh.write("{}\t{}\t{}\t".format(*region))
+            ofh.write("\t".join("{:4f}".format(x) for x in transformed_depths[i,:]))
+            ofh.write("\n")
+
+
+
+def train(depths_path, model_save_path, use_depth_mask, var_cutoff, chunk_size, min_depth, low_depth_trim_frac, high_depth_trim_frac, high_cv_trim_frac, cluster_width, norm_depths_output):
     """
     Train a new model by reading in a depths matrix, masking low quality sites, applying some transformation, removing PCA
     components in chunks, then estimating transformed depths of duplications and deletions and emitting them all in a
@@ -216,6 +235,11 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, chunk_size, 
 
     logging.info("Parameter fitting complete, generating QC stats")
     comps, directions = qc.compute_background_pca(all_params, np.squeeze(np.array(all_transformed)).T)
+
+    if norm_depths_output:
+        logging.info("Writing normalized depths to file {}".format(norm_depths_output))
+        write_normed_depths(masked_regions, sample_names, np.squeeze(np.array(all_transformed)), norm_depths_output)
+
 
     logging.info("Training run complete, saving model to {}".format(model_save_path))
 
