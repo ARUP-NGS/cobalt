@@ -210,9 +210,9 @@ def train(depths_path, model_save_path, use_depth_mask, var_cutoff, chunk_size, 
             all_transformed[o_index] = np.asarray(transformed_depths[:,j])
 
         chunk_data.append((indices, components))
-        for i,par in enumerate(params):
-            for j,p in zip(indices, par):
-                all_params[i][j] = p
+        for k, par in enumerate(params):
+            for j, p in zip(indices, par):
+                all_params[k][j] = p
 
     logging.info("Parameter fitting complete, generating QC stats")
     comps, directions = qc.compute_background_pca(all_params, np.squeeze(np.array(all_transformed)).T)
