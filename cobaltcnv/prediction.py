@@ -266,7 +266,7 @@ def emit_site_info(model_path, emit_bed=False, outfile=None):
                 print(div_line)
             mask_index += 1
     if outfile is not None:
-        return outlines
+        return util.write_file(outfile, outlines)
 
 
 def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edges):
