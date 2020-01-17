@@ -248,7 +248,7 @@ def emit_site_info(model_path, emit_bed=False, outfile=None):
     mask_index = 0
     for nomask_index, region in enumerate(cmodel.regions):
         if mask is not None and not mask[nomask_index]:
-            mask = "\t".join([region[0], region[1], region[2], "MASKED"])
+            mask = f"{region[0]}\t{region[1]}\t{region[2]}\tMASKED"
             if outfile:
                 outlines.append(mask)
             else:
@@ -259,7 +259,7 @@ def emit_site_info(model_path, emit_bed=False, outfile=None):
             del_mu = cmodel.params[dip_index-1][mask_index][1]
             del_sigma = cmodel.params[dip_index - 1][mask_index][2]
             divergence = gaussian_kullback_leibler(del_mu, del_sigma, dip_mu, dip_sigma)
-            div_line = "\t".join([region[0], region[1], region[2], f"{divergence:.4}"])
+            div_line = f"{region[0]}\t{region[1]}\t{region[2]}\t{divergence:.4}"
             if outfile is not None:
                 outlines.append(div_line)
             else:
