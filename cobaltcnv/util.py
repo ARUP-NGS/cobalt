@@ -326,3 +326,14 @@ def x_depth_ratio(regions, depths, genome, min_num_x_regions=10):
 
 
     return xdepths.mean() / autosome_depths.mean()
+
+
+def write_file(outfile, lines):
+    if not isinstance(lines, list):
+        lines = [lines]
+    with open(outfile, "w") as fh:
+        for line in lines:
+            if not line.endswith("\n"):
+                fh.write(line + "\n")
+            else:
+                fh.write(line)
