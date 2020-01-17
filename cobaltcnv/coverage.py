@@ -33,7 +33,7 @@ def count(args, ref_genome, readfilter):
     alnfile.close()
     return counts
 
-def coverage(bed, bams, threads, min_mapq, ref_genome, outfile=None):
+def coverage(bed, bams, threads, min_mapq, ref_genome=None, outfile=None):
     outlines = []
     pool = mp.Pool( threads )
     sample_names = "\t".join([os.path.basename(b) for b in bams])
