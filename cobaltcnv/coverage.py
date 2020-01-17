@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import pysam
+import sys
 import os
 import multiprocessing as mp
 from functools import partial
@@ -33,15 +34,12 @@ def count(args, ref_genome, readfilter):
     alnfile.close()
     return counts
 
-def coverage(bed, bams, threads, min_mapq=10, ref_genome=None, outfile=None):
+def coverage(bed, bams, threads, min_mapq=10, ref_genome=None, outfh=sys.stdout):
     outlines = []
     pool = mp.Pool( threads )
     sample_names = "\t".join([os.path.basename(b) for b in bams])
     header = f"#chrom\tstart\tend\t{sample_names}"
-    if outfile is not None:
-        outlines.append(header)
-    else:
-        print(header)
+    outlines.append(header)
     #print("#chrom\tstart\tend\t" + "\t".join([b.split("/")[-3] for b in bams]))
     chunksize = 250
     chunks = []
@@ -59,10 +57,7 @@ def coverage(bed, bams, threads, min_mapq=10, ref_genome=None, outfile=None):
             for i, region in enumerate(chunks):
                 cov = "\t".join(str(c[i]) for c in counts)
                 cov_line = f"{region[0]}\t{region[1]}\t{region[2]}\t{cov}"
-                if outfile is not None:
-                    outlines.append(cov_line)
-                else:
-                    print(cov_line)
+                outlines.append(cov_line)
             chunks = []
 
     #Don't forget last few
@@ -70,9 +65,5 @@ def coverage(bed, bams, threads, min_mapq=10, ref_genome=None, outfile=None):
     for i, region in enumerate(chunks):
         covs = "\t".join(str(c[i]) for c in counts)
         covs_line = f"{region[0]}\t{region[1]}\t{region[2]}\t{covs}"
-        if outfile is not None:
-            outlines.append(covs_line)
-        else:
-            print(covs_line)
-    if outfile is not None:
-        util.write_file(outfile, outlines)
+        outlines.append(covs_line)
+    outfh.write("\n".join(outlines))

@@ -229,7 +229,7 @@ def gaussian_kullback_leibler(mu1, sig1, mu2, sig2):
     return np.log(sig2 / sig1) + (sig1*sig1 + np.power(mu1-mu2, 2.0))/(2.0*sig2*sig2) - 0.5
 
 
-def emit_site_info(model_path, emit_bed=False, outfile=None):
+def emit_site_info(model_path, emit_bed=False, outfh=sys.stdout):
     cmodel = model.load_model(model_path)
 
     if not emit_bed:
@@ -249,10 +249,7 @@ def emit_site_info(model_path, emit_bed=False, outfile=None):
     for nomask_index, region in enumerate(cmodel.regions):
         if mask is not None and not mask[nomask_index]:
             mask = f"{region[0]}\t{region[1]}\t{region[2]}\tMASKED"
-            if outfile:
-                outlines.append(mask)
-            else:
-                print(mask)
+            outlines.append(mask)
         else:
             dip_mu = cmodel.params[dip_index][mask_index][1]
             dip_sigma = cmodel.params[dip_index][mask_index][2]
@@ -260,13 +257,9 @@ def emit_site_info(model_path, emit_bed=False, outfile=None):
             del_sigma = cmodel.params[dip_index - 1][mask_index][2]
             divergence = gaussian_kullback_leibler(del_mu, del_sigma, dip_mu, dip_sigma)
             div_line = f"{region[0]}\t{region[1]}\t{region[2]}\t{divergence:.4}"
-            if outfile is not None:
-                outlines.append(div_line)
-            else:
-                print(div_line)
+            outlines.append(div_line)
             mask_index += 1
-    if outfile is not None:
-        return util.write_file(outfile, outlines)
+    outfh.write("\n".join(outlines))
 
 
 def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edges):
