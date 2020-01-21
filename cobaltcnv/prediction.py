@@ -228,7 +228,8 @@ def gaussian_kullback_leibler(mu1, sig1, mu2, sig2):
     """
     return np.log(sig2 / sig1) + (sig1*sig1 + np.power(mu1-mu2, 2.0))/(2.0*sig2*sig2) - 0.5
 
-def emit_site_info(model_path, emit_bed=False):
+
+def emit_site_info(model_path, emit_bed=False, outfh=sys.stdout):
     cmodel = model.load_model(model_path)
 
     if not emit_bed:
@@ -243,21 +244,22 @@ def emit_site_info(model_path, emit_bed=False):
     modelhmm = _create_hmm(cmodel.params, cmodel.mods, 0.05, 0.05)
     dip_index = next((i, em) for i, em in enumerate(modelhmm.em) if em.copy_number() == 2)[0]
     # dip_index = int(len(cmodel.params) / 2)
-
+    outlines = []
     mask_index = 0
     for nomask_index, region in enumerate(cmodel.regions):
         if mask is not None and not mask[nomask_index]:
-            print("{}\t{}\t{}\t{}".format(region[0], region[1], region[2], "MASKED"))
+            mask = f"{region[0]}\t{region[1]}\t{region[2]}\tMASKED"
+            outlines.append(mask)
         else:
             dip_mu = cmodel.params[dip_index][mask_index][1]
             dip_sigma = cmodel.params[dip_index][mask_index][2]
             del_mu = cmodel.params[dip_index-1][mask_index][1]
             del_sigma = cmodel.params[dip_index - 1][mask_index][2]
             divergence = gaussian_kullback_leibler(del_mu, del_sigma, dip_mu, dip_sigma)
-            print("{}\t{}\t{}\t{:.4}".format(region[0], region[1], region[2], divergence))
+            div_line = f"{region[0]}\t{region[1]}\t{region[2]}\t{divergence:.4}"
+            outlines.append(div_line)
             mask_index += 1
-
-
+    outfh.write("\n".join(outlines))
 
 
 def segment_cnvs(regions, stateprobs, modelhmm, ref_ploidy, trim_low_quality_edges):
