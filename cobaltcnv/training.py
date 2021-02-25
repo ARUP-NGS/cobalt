@@ -52,7 +52,7 @@ def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
         for i,p in enumerate(fits):
             all_params[i].append(p)
 
-    transformed_zscored = (transformed - np.median(transformed, axis=1)) / transformed.std(axis=1)
+    transformed_zscored = (transformed - np.median(transformed, axis=1)[:, np.newaxis]) / transformed.std(axis=1)[:, np.newaxis]
     return components, all_params, transformed_zscored
 
 

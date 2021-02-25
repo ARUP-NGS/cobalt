@@ -24,7 +24,7 @@ class HMM(object):
     """
 
     def __init__(self, transitions, emissions, init_dist):
-        self.tr = np.matrix(transitions)
+        self.tr = np.array(transitions)
         self.em = list(emissions)
         self.initial = init_dist
         self._validate()
@@ -40,7 +40,7 @@ class HMM(object):
         if len(self.initial) != matrix_dim[0]:
             raise HMMError("Unequal initial state dist length vs transitions(found {} vs {})".format(len(self.initial), matrix_dim[0]))
         # Make sure column and row sums are (pretty close) to 1
-        for i, s in enumerate(self.tr.sum(axis=1).getA1()):
+        for i, s in enumerate(self.tr.sum(axis=1).flatten()):
             if abs(s - 1.0) > 1e-9:
                 raise HMMError("Sum of row {} is not equal to 1: {}".format(i, s))
 
@@ -156,9 +156,9 @@ class HMM(object):
 
         backptrs = []
 
-        if type(obs[0])==list:
+        if type(obs[0]) == list:
             site_max = len(obs[0])
-        elif type(obs)==np.matrix:
+        elif type(obs) == np.array:
             site_max = np.max(obs.shape)
         else:
             site_max = len(obs)
@@ -210,30 +210,31 @@ class HMM(object):
         states.reverse()
         return states
 
-def forward_likelihood_vector(obs, exposure=1.0, initial=None, transitions=None, emissions=None):
-    """
-    Compute the log-likelihood of the sequence of observations using the Forward algorithm
-    We do this in a unbound function so we can parallelize more easily
-    :param obs: Series of observed values
-    """
-    trellis = np.array([x for x in initial])
-    offset = 0.0  # Running tab of log-likelihood added to trellis so we can avoid overflow issues when using np.exp
-
-    # Compute logpmfs for all sites for all emissions distributions at outset,
-    eds = np.array([d.logpmf(obs, exposure) for d in emissions])
-
-    try:
-        for t, o in enumerate(obs):
-            #TODO : Replace sum builtin with numpy version (but naive replacement doesn't work)
-            newcol = (eds[:,t] + np.log(sum(np.dot(trellis, transitions)))) + offset
-            offset = np.max(newcol)
-            trellis = (np.exp(newcol - offset)).getA1()
-
-    except ParameterViolation:
-        return float("-inf")
-
-    logL = np.log(sum(trellis)) + offset
-    return logL
+# def forward_likelihood_vector(obs, exposure=1.0, initial=None, transitions=None, emissions=None):
+#     """
+#   CURRENTLY BROKEN!
+#     Compute the log-likelihood of the sequence of observations using the Forward algorithm
+#     We do this in a unbound function so we can parallelize more easily
+#     :param obs: Series of observed values
+#     """
+#     trellis = np.array([x for x in initial])
+#     offset = 0.0  # Running tab of log-likelihood added to trellis so we can avoid overflow issues when using np.exp
+#
+#     # Compute logpmfs for all sites for all emissions distributions at outset,
+#     eds = np.array([d.logpmf(obs, exposure) for d in emissions])
+#
+#     try:
+#         for t, o in enumerate(obs):
+#             #TODO : Replace sum builtin with numpy version (but naive replacement doesn't work)
+#             newcol = (eds[:,t] + np.log(sum(np.dot(trellis, transitions)))) + offset
+#             offset = np.max(newcol)
+#             trellis = (np.exp(newcol - offset))
+#
+#     except ParameterViolation:
+#         return float("-inf")
+#
+#     logL = np.log(sum(trellis)) + offset
+#     return logL
 
 def forward_likelihood(obs, initial=None, transitions=None, emissions=None):
     """
@@ -327,10 +328,10 @@ def _compute_forward_backward_raw(obs, initial, transitions, emissions, exposure
 
             # Backward trellis - start from end and iterate toward beginning
             bt = len(obs)-t-1
-            eds2 = np.matrix([[eds[j][bt] * backward_trellis[0][j] for j in
+            eds2 = np.array([[eds[j][bt] * backward_trellis[0][j] for j in
                                range(num_states)]])
             eds2 = np.transpose(eds2)
-            back_col = (np.log( transitions.dot(eds2)) + backward_offsets[0]).getA1()
+            back_col = (np.log( transitions.dot(eds2)) + backward_offsets[0]).flatten()
 
             backward_offsets.insert(0, max(back_col))
             col_to_append = np.exp(back_col - backward_offsets[0])

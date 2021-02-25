@@ -65,7 +65,6 @@ def test_find_index():
 
 
 def test_xratio():
-
     regions = [
         ("1", 10, 20),
         ("1", 30, 50),
