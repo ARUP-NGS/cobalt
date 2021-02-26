@@ -23,7 +23,7 @@ import logging
 import sys
 
 # The minimum size of a 'chunk' (list of regions over which the SVD is computed)
-MIN_CHUNK_SIZE = 10
+MIN_CHUNK_SIZE = 100
 
 
 def _fit_sites(depth_matrix, depths_prepped, var_cutoff, mods, min_depth):
