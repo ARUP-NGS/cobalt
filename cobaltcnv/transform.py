@@ -49,7 +49,7 @@ def fit_svd(prepped_depths, var_cutoff, max_components=25):
     prop_v = np.cumsum(S * S / (np.sum(S * S)))  # Cumulative proportion of variance explained
     eigs = np.nonzero(prop_v > var_cutoff)[0][0]  # Number of components (columns of V) to retain
     logging.debug("Retaining top {} vectors from SVD".format(eigs))
-    return np.matrix(V[0:eigs,:]).T
+    return np.array(V[0:eigs,:]).T
 
 
 # @util.timeit
@@ -89,7 +89,7 @@ def transform_raw_iterative(sample_depths, components, zscores=True):
     :return:
     """
     mat_centered = sample_depths
-    result = np.matrix(mat_centered.copy())
+    result = np.array(mat_centered.copy())
     for i in range(components.shape[0]):
         result[:,i] -= mat_centered.dot(components.dot(components[i, :].T))
     if not zscores:
@@ -102,7 +102,8 @@ def transform_raw_iterative(sample_depths, components, zscores=True):
 def transform_single_site(depths, components, site, orig_scores=None, zscores=True):
 
     a = depths.dot(components.dot(components[site, :].T))
-    result = depths[:,site].reshape((depths.shape[0], 1)) - a
+    #result = depths[:,site].reshape((depths.shape[0], 1)) - a
+    result = depths[:, site] - a
 
     if not zscores:
         return result
@@ -110,8 +111,9 @@ def transform_single_site(depths, components, site, orig_scores=None, zscores=Tr
         if orig_scores is None:
             raise ValueError("Must supply original transformed but not z-scored data for z-scores")
         b = orig_scores.copy()
-        b[:,site] = result.reshape(result.shape[0], 1)
-        zscores = (b - np.median(b, axis=1)) / b.std(axis=1)
+        # b[:,site] = result.reshape(result.shape[0], 1)
+        b[:, site] = result
+        zscores = (b - np.median(b, axis=1)[:, np.newaxis]) / (b.std(axis=1)[:, np.newaxis])
         return zscores
 
 
@@ -142,7 +144,7 @@ def fit_single(dmat, components, site, intermediate, id_outliers=True, sample_ma
             raise ValueError('Cant find outliers and use sample mask at the same time')
 
         if id_outliers:
-            transformed_obs, which = util.remove_outliers(transformed_obs.getA1(), cutoff=3.25)
+            transformed_obs, which = util.remove_outliers(transformed_obs.flatten(), cutoff=3.25)
 
         if sample_mask:
             transformed_obs = transformed_obs[sample_mask]

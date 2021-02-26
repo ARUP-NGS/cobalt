@@ -552,7 +552,7 @@ def call_cnvs(cmodel, depths, alpha, beta, assume_female, genome, trim_lowqual_e
     """
     Discover CNVs in the list of depths using a CobaltModel (cmodel)
     :param cmodel: CobaltModel object
-    :param depths: np.Matrix of sample depths
+    :param depths: np.array of sample depths
     :param alpha: FIrst transition prob param
     :param beta: Second transition prob param
     :param assume_female: Use female X chrom model (if false, use male, if None, infer)
@@ -644,7 +644,7 @@ def run_qc(model_path, depths_path, outputfh):
     outputfh.write("sample,mean_distance,score\n")
 
     for i, name in enumerate(sample_names):
-        depths = np.matrix(sample_depths[:, i]).reshape((sample_depths.shape[0], 1))
+        depths = np.array(sample_depths[:, i]).reshape((sample_depths.shape[0], 1))
         _, transformed_depths = mask_prepare_transform_depths(cmodel, depths)
         mean_dist, score = qc.compute_mean_dist(cmodel, transformed_depths)
         outputfh.write("{},{:.3f},{:.4f}\n".format(name, mean_dist, score))
@@ -689,7 +689,7 @@ def predict(model_path,
     if sample_depths.shape[1] > 1:
         logging.warning("Found multiple samples in depths bed file, only the first will be analyzed")
 
-    depths = np.matrix(sample_depths[:, 0]).reshape((sample_depths.shape[0], 1))
+    depths = np.array(sample_depths[:, 0]).reshape((sample_depths.shape[0], 1))
 
 
     logging.info("Beginning prediction run with alpha = {}, beta = {} and min_output_quality = {}".format(alpha, beta,

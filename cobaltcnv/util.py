@@ -199,6 +199,7 @@ def read_regions(bed):
             regions.append( (toks[0], int(toks[1]), int(toks[2])) )
     return regions
 
+
 def gen_transition_matrix(alpha, beta, dimension):
     """
     Create a transition matrix suitable for HMM use of the given dimension
@@ -207,11 +208,11 @@ def gen_transition_matrix(alpha, beta, dimension):
     :param alpha: probability of moving from away from the middle state - moving to a CN-altered state
     :param beta: probability of transitioning back to a more normal state
     :param dimension: Number of rows & columns of transition matrix
-    :return: np.matrix suitable for HMM use
+    :return: np.array suitable for HMM use
     """
     vals = []
-    if dimension==1:
-        return np.matrix([[1.0]])
+    if dimension == 1:
+        return np.array([[1.0]])
 
     for i in range(dimension):
         row = np.zeros(dimension)
@@ -239,7 +240,7 @@ def gen_transition_matrix(alpha, beta, dimension):
 
         vals.append(row)
 
-    return np.matrix(vals)
+    return np.array(vals)
 
 def fmt(s):
     """

@@ -1,7 +1,7 @@
 
 import pytest
 import numpy as np
-from cobaltcnv.hmm import HMM, HMMError, forward_likelihood_vector
+from cobaltcnv.hmm import HMM, HMMError
 
 class SimpleDiscreteDist(object):
     """ Helper for testing very simple cases"""
@@ -27,27 +27,27 @@ def almost_equal(a,b, tol=1e-6):
     return abs(a-b) < tol
 
 def test_bad_t_matrix():
-    m = np.matrix([[0.333, 0.666], [0.666, 0.333]])
+    m = np.array([[0.333, 0.666], [0.666, 0.333]])
     with pytest.raises(HMMError):
         hmm = HMM(m, [0, 0], [1.0, 0.0])
 
 
 def test_bad_state_len():
-    m = np.matrix([[0.4, 0.6], [0.6, 0.4]])
+    m = np.array([[0.4, 0.6], [0.6, 0.4]])
     with pytest.raises(HMMError):
         hmm = HMM(m, [0, 0], [1.0, 0.0, 0.0])
 
 
 
 def test_happy_init():
-    m = np.matrix([[0.4, 0.6], [0.6, 0.4]])
+    m = np.array([[0.4, 0.6], [0.6, 0.4]])
     try:
         hmm = HMM(m, [0, 0], [1.0, 0.0])
     except HMMError:
         assert False, "Unexpected error on initialization"
 
 def test_simple_forward():
-    m = np.matrix([[0.4, 0.6], [0.6, 0.4]])
+    m = np.array([[0.4, 0.6], [0.6, 0.4]])
     inits = [0.3, 0.7]
     edists = [
         SimpleDiscreteDist([0.1, 0.9]),
@@ -61,7 +61,7 @@ def test_simple_forward():
 
 def test_bigger_forward():
     alpha = 0.1
-    m = np.matrix([[1.0-alpha, alpha, 0.0], [alpha, 1.0-2*alpha, alpha], [0.0, alpha, 1.0-alpha]])
+    m = np.array([[1.0-alpha, alpha, 0.0], [alpha, 1.0-2*alpha, alpha], [0.0, alpha, 1.0-alpha]])
     inits = [0.3, 0.7, 0.0]
     edists = [
         SimpleDiscreteDist([0.1, 0.9]),
@@ -77,33 +77,33 @@ def test_bigger_forward():
     EXPECTED_RESULT = -21.7826845758  # Calculated by simple debugging forward algo
     assert almost_equal(l, EXPECTED_RESULT)
 
-def test_vectorized_forward():
-    """
-    Simple test of vectorization code, this is the same data as test_bigger_forward, but uses vectorized
-    hmm code
-    """
-    alpha = 0.1
-    m = np.matrix([[1.0 - alpha, alpha, 0.0], [alpha, 1.0 - 2 * alpha, alpha], [0.0, alpha, 1.0 - alpha]])
-    inits = [0.3, 0.7, 0.0]
-    edists = [
-        SimpleDiscreteDist([0.1, 0.9]),
-        SimpleDiscreteDist([0.4, 0.4, 0.1, 0.1]),
-        SimpleDiscreteDist([0.1, 0.2, 0.5, 0.1, 0.1]),
-    ]
-
-    hmm = HMM(m, edists, inits)
-    obs = [0, 1, 1, 2, 2, 1, 0, 0, 1, 1, 4, 3, 4]
-    exposure = 1.0
-    l = forward_likelihood_vector(obs, exposure, initial=hmm.initial, transitions=hmm.tr, emissions=hmm.em)
-    dbg = hmm._forward_dbg(obs)
-    assert almost_equal(l, dbg)
-    EXPECTED_RESULT = -21.7826845758  # Calculated by simple debugging forward algo
-    assert almost_equal(l, EXPECTED_RESULT)
+# def test_vectorized_forward():
+#     """
+#     Simple test of vectorization code, this is the same data as test_bigger_forward, but uses vectorized
+#     hmm code
+#     """
+#     alpha = 0.1
+#     m = np.array([[1.0 - alpha, alpha, 0.0], [alpha, 1.0 - 2 * alpha, alpha], [0.0, alpha, 1.0 - alpha]])
+#     inits = [0.3, 0.7, 0.0]
+#     edists = [
+#         SimpleDiscreteDist([0.1, 0.9]),
+#         SimpleDiscreteDist([0.4, 0.4, 0.1, 0.1]),
+#         SimpleDiscreteDist([0.1, 0.2, 0.5, 0.1, 0.1]),
+#     ]
+#
+#     hmm = HMM(m, edists, inits)
+#     obs = [0, 1, 1, 2, 2, 1, 0, 0, 1, 1, 4, 3, 4]
+#     exposure = 1.0
+#     l = forward_likelihood_vector(obs, exposure, initial=hmm.initial, transitions=hmm.tr, emissions=hmm.em)
+#     dbg = hmm._forward_dbg(obs)
+#     assert almost_equal(l, dbg)
+#     EXPECTED_RESULT = -21.7826845758  # Calculated by simple debugging forward algo
+#     assert almost_equal(l, EXPECTED_RESULT)
 
 
 def test_viterbi_small():
     """ This example is taken directly from wikipedia as of 10/15/2016 """
-    m = np.matrix([[0.7, 0.3],
+    m = np.array([[0.7, 0.3],
                    [0.4, 0.6]])
     inits = [0.6, 0.4]
     edists = [
@@ -118,7 +118,7 @@ def test_viterbi_small():
 
 def test_viterbi_small2():
     """ This example is taken directly from http://homepages.ulb.ac.be/~dgonze/TEACHING/viterbi.pdf as of 10/15/2016 """
-    m = np.matrix([[0.5, 0.5],
+    m = np.array([[0.5, 0.5],
                    [0.4, 0.6]])
     inits = [0.5, 0.5]
     edists = [
@@ -131,11 +131,12 @@ def test_viterbi_small2():
     assert [0, 0, 0, 1, 1, 1, 1, 1, 1] == path
     assert almost_equal(-16.9734022962, prob)
 
+
 def test_forward_backward():
     """
     Test forward-backward algorithm. This example taken from wikipedia: https://en.wikipedia.org/wiki/Forward%E2%80%93backward_algorithm
     """
-    m = np.matrix([[0.7, 0.3], [0.3, 0.7]])
+    m = np.array([[0.7, 0.3], [0.3, 0.7]])
     inits = [0.5, 0.5]
     edists = [
         SimpleDiscreteDist([0.9, 0.1]),

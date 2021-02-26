@@ -6,12 +6,12 @@ from cobaltcnv import transform
 def test_iterate_transform_zscore():
 
     # 2x6
-    components = np.matrix([
+    components = np.array([
         [1, 2, 3, 0.1, 0.2, 0.3],
         [1.1, 2.2, 0.3, 0.4, 1.6, 1.3],
     ]).T
 
-    data = np.matrix([
+    data = np.array([
         [4,6,2,3,4,6]
     ], dtype=np.float64)
 
@@ -22,18 +22,18 @@ def test_iterate_transform_zscore():
     b = transform.transform_raw_iterative(data, components, zscores=True)
 
     assert a.shape == b.shape
-    for x,y in zip(a.getA1(), b.getA1()):
+    for x,y in zip(a.flatten(), b.flatten()):
         assert abs(x - y) < 1e-6
 
 def test_iterate_transform():
 
     # 2x6
-    components = np.matrix([
+    components = np.array([
         [1, 2, 3, 0.1, 0.2, 0.3],
         [1.1, 2.2, 0.3, 0.4, 1.6, 1.3],
     ]).T
 
-    data = np.matrix([
+    data = np.array([
         [4,6,2,3,4,6]
     ], dtype=np.float64)
 
@@ -44,16 +44,16 @@ def test_iterate_transform():
     b = transform.transform_raw_iterative(data, components, zscores=False)
 
     assert a.shape == b.shape
-    for x,y in zip(a.getA1(), b.getA1()):
+    for x,y in zip(a.flatten(), b.flatten()):
         assert abs(x - y) < 1e-6
 
 def test_transform_single_site():
-    components = np.matrix([
+    components = np.array([
         [1, 2, 3, 0.1, 0.2, 0.3],
         [1.1, 2.2, 0.3, 0.4, 1.6, 1.3],
     ]).T
 
-    data = np.matrix([
+    data = np.array([
         [4, 6, 2, 3, 4, 6]
     ], dtype=np.float64)
 
