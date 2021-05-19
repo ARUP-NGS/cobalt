@@ -210,37 +210,54 @@ def gen_transition_matrix(alpha, beta, dimension):
     :param dimension: Number of rows & columns of transition matrix
     :return: np.array suitable for HMM use
     """
+
+    assert alpha == beta, "Sorry, but alpha must be equal to beta for now"
     vals = []
     if dimension == 1:
         return np.array([[1.0]])
 
     for i in range(dimension):
         row = np.zeros(dimension)
-        if i==0:
-            row[i] = 1.0 - beta
+        if i == 0:
             row[i+1] = beta
-        elif i==(dimension-1):
-            row[i] = 1.0 - beta
+            row[i+2] = beta / 2
+        elif i == (dimension-1):
             row[i-1] = beta
+            row[i-2] = beta / 2
         else:
-
-
-            if i==(dimension/2):
-                row[i] = 1.0 - 2*alpha
+            if i == (dimension/2):
                 row[i-1] = alpha
+                if i-2 >= 0:
+                    row[i-2] = alpha / 2
                 row[i+1] = alpha
+                if i+2 < dimension:
+                    row[i+2] = alpha / 2
+
             elif i<(dimension/2):
-                row[i] = 1.0 - alpha - beta
                 row[i - 1] = alpha
+                if i-2 >= 0:
+                    row[i-2] = alpha / 2
                 row[i + 1] = beta
+                if i+2 < dimension:
+                    row[i+2] = beta / 2
+
             else:
-                row[i] = 1.0 - alpha - beta
                 row[i-1] = beta
+                if i-2 >= 0:
+                    row[i-2] = beta / 2
                 row[i+1] = alpha
+                if i+2 < dimension:
+                    row[i+2] = alpha / 2
+        row[i] = 1.0 - sum(row)
 
         vals.append(row)
 
-    return np.array(vals)
+    t = np.array(vals)
+    # Make sure we didn't accidentally generate some kind of degenerate transition matrix
+    assert np.allclose(np.sum(t, axis=1), np.ones(dimension))
+    assert np.allclose(np.sum(t, axis=0), np.ones(dimension))
+
+    return t
 
 def fmt(s):
     """
