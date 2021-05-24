@@ -108,3 +108,15 @@ def test_interval_overlap():
     assert not util.intervals_overlap(
         ("1", 5, 10),
         ("2", 8, 17))
+
+
+def test_build_transition_matrix():
+    alpha = 0.1
+    beta = 0.1
+    dimension = 5
+    p = util.gen_transition_matrix(alpha, beta, dimension)
+    # Make sure all rows have sum = 1
+    assert np.allclose(np.sum(p, axis=1), np.ones(dimension))
+
+    # Make sure all columns have sum = 1
+    assert np.allclose(np.sum(p, axis=0), np.ones(dimension))
